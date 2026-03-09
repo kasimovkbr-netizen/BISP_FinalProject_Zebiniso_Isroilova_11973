@@ -180,6 +180,15 @@ children: `<div class="children-page">
   </div>
 `,
 
+    savedarticles: `
+<div class="saved-articles-page">
+  <div class="container">
+    <h2>⭐ Saved Articles</h2>
+    <ul id="savedArticlesList"></ul>
+  </div>
+</div>
+`,
+
     addanalysis: `
   <div class="addanalysis">
     <div class="container">
@@ -354,6 +363,11 @@ menuItems.forEach(item => {
       if (typeof module.destroyKnowledgeBaseModule === "function") {
         window.__destroyCurrentPage = module.destroyKnowledgeBaseModule;
       }
+    }
+
+    if (pageKey === "savedarticles") {
+      const module = await import("./savedarticles.module.js");
+      module.initSavedArticlesModule();
     }
   });
 });

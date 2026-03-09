@@ -1713,3 +1713,99 @@
     align-items: flex-start;
   }
 }
+
+/* ===== Saved Articles ===== */
+
+.saved-card {
+  background: #ffffff;
+  padding: 18px;
+  margin-bottom: 15px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.saved-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+
+.saved-card h4 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: #222;
+}
+
+.saved-card p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+/* Detail view */
+
+.saved-detail h2 {
+  margin-top: 10px;
+}
+
+.saved-detail button {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  margin-top: 15px;
+}
+
+#removeBookmark {
+  background: #ff4d4f;
+  color: white;
+}
+
+#removeBookmark:hover {
+  background: #d9363e;
+}
+
+#backToSaved {
+  background: #f0f2f5;
+  margin-bottom: 10px;
+}
+
+/* ===== Healthcare Theme ===== */
+
+body {
+  background-color: #F7FAFC;
+}
+
+.container {
+  max-width: 900px;
+  margin: auto;
+}
+
+.card,
+.saved-card {
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.card:hover,
+.saved-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.06);
+}
+
+button {
+  font-weight: 500;
+}
+
+button.primary {
+  background: #2F80ED;
+  color: white;
+  border: none;
+}
+
+button.primary:hover {
+  background: #1c6cd4;
+}

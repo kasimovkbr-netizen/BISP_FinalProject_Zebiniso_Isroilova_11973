@@ -1,10 +1,13 @@
-import { db } from "./firebase.js";
+import { db, auth } from "./firebase.js";
 import {
   collection,
   query,
   where,
   orderBy,
-  getDocs
+  getDocs,
+  addDoc,
+  deleteDoc,
+  doc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 let currentCategory = "";
@@ -56,11 +59,11 @@ function attachDelegatedListeners() {
     }
 
     if (articleBtn) {
-      const articleId = articleBtn.dataset.id;
-      const article = currentArticles.find((a) => a.id === articleId);
-      if (article) renderArticleDetail(article);
-      return;
-    }
+  const articleId = articleBtn.dataset.id;
+  const article = currentArticles.find((a) => a.id === articleId);
+  if (article) await renderArticleDetail(article);
+  return;
+}
 
     if (backHomeBtn) {
       showHomeView();
@@ -131,7 +134,7 @@ function renderArticlesList() {
   `).join("");
 }
 
-function renderArticleDetail(article) {
+async function renderArticleDetail(article) {
   const title = document.getElementById("kbDetailTitle");
   const summary = document.getElementById("kbDetailSummary");
   const warning = document.getElementById("kbDetailWarning");
@@ -149,6 +152,34 @@ function renderArticleDetail(article) {
     warning.textContent = "";
     warning.classList.add("hidden");
   }
+
+  // Bookmark button qo‘shamiz
+let bookmarkBtn = document.getElementById("kbBookmarkBtn");
+
+if (!bookmarkBtn) {
+  bookmarkBtn = document.createElement("button");
+  bookmarkBtn.id = "kbBookmarkBtn";
+  bookmarkBtn.className = "kb-bookmark-btn";
+  bookmarkBtn.style.marginBottom = "15px";
+
+  // title elementdan keyin qo‘shamiz
+  title.insertAdjacentElement("afterend", bookmarkBtn);
+}
+
+// Avval bookmark qilinganmi tekshiramiz
+const existingBookmark = await isBookmarked(article.id);
+
+bookmarkBtn.textContent = existingBookmark
+  ? "⭐ Remove Bookmark"
+  : "⭐ Save Article";
+
+bookmarkBtn.onclick = async () => {
+  const saved = await toggleBookmark(article.id);
+
+  bookmarkBtn.textContent = saved
+    ? "⭐ Remove Bookmark"
+    : "⭐ Save Article";
+};
 
   content.innerHTML = formatContent(article.content || "");
   showDetailView();
@@ -200,4 +231,38 @@ function escapeHtml(str) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+async function isBookmarked(articleId) {
+  const user = auth.currentUser;
+  if (!user) return null;
+
+  const q = query(
+    collection(db, "user_bookmarks"),
+    where("userId", "==", user.uid),
+    where("articleId", "==", articleId)
+  );
+
+  const snap = await getDocs(q);
+
+  return snap.empty ? null : snap.docs[0];
+}
+
+async function toggleBookmark(articleId) {
+  const user = auth.currentUser;
+  if (!user) return false;
+
+  const existingDoc = await isBookmarked(articleId);
+
+  if (existingDoc) {
+    await deleteDoc(doc(db, "user_bookmarks", existingDoc.id));
+    return false;
+  } else {
+    await addDoc(collection(db, "user_bookmarks"), {
+      userId: user.uid,
+      articleId: articleId,
+      savedAt: new Date()
+    });
+    return true;
+  }
 }
