@@ -9,11 +9,10 @@ import {
   deleteDoc,
   updateDoc,
   doc,
-  serverTimestamp
+  serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-import { onAuthStateChanged }
-from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const db = getFirestore();
 
@@ -24,7 +23,7 @@ let editId = null;
 let pendingDeleteChildId = null;
 
 export function initChildrenModule() {
-  onAuthStateChanged(auth, user => {
+  onAuthStateChanged(auth, (user) => {
     if (!user) return;
     userId = user.uid;
 
@@ -45,17 +44,22 @@ async function loadChildren() {
   const q = query(collection(db, "children"), where("parentId", "==", userId));
   const snap = await getDocs(q);
 
-  snap.forEach(docSnap => {
+  snap.forEach((docSnap) => {
     const c = docSnap.data();
 
     const li = document.createElement("li");
     li.className = "child-card";
 
+    const ageLabel =
+      c.ageUnit === "months"
+        ? `${Number(c.age ?? 0)} mo`
+        : `${Number(c.age ?? 0)} yrs`;
+
     li.innerHTML = `
       <div class="child-info">
         <span class="child-name">${escapeHtml(c.name ?? "")}</span>
         <span class="divider">|</span>
-        <span class="child-age">${Number(c.age ?? 0)} yrs</span>
+        <span class="child-age">${ageLabel}</span>
         <span class="divider">|</span>
         <span class="gender">${escapeHtml(c.gender ?? "")}</span>
       </div>
@@ -68,7 +72,8 @@ async function loadChildren() {
 
     // actions
     li.querySelector(".editBtn").onclick = () => openModal(c, docSnap.id);
-    li.querySelector(".deleteBtn").onclick = () => openDeleteConfirm(docSnap.id, c?.name);
+    li.querySelector(".deleteBtn").onclick = () =>
+      openDeleteConfirm(docSnap.id, c?.name);
 
     list.appendChild(li);
   });
@@ -85,6 +90,27 @@ function setupUI() {
   if (addChildBtn) addChildBtn.onclick = () => openModal();
   if (closeChildModal) closeChildModal.onclick = () => closeModal();
 
+  // Age unit toggle
+  const ageUnitYears = document.getElementById("ageUnitYears");
+  const ageUnitMonths = document.getElementById("ageUnitMonths");
+  const ageUnitInput = document.getElementById("ageUnit");
+  const ageInput = document.getElementById("age");
+
+  if (ageUnitYears && ageUnitMonths) {
+    ageUnitYears.onclick = () => {
+      ageUnitYears.classList.add("active");
+      ageUnitMonths.classList.remove("active");
+      if (ageUnitInput) ageUnitInput.value = "years";
+      if (ageInput) ageInput.placeholder = "Age (years)";
+    };
+    ageUnitMonths.onclick = () => {
+      ageUnitMonths.classList.add("active");
+      ageUnitYears.classList.remove("active");
+      if (ageUnitInput) ageUnitInput.value = "months";
+      if (ageInput) ageInput.placeholder = "Age (months)";
+    };
+  }
+
   if (childForm) {
     childForm.onsubmit = async (e) => {
       e.preventDefault();
@@ -92,15 +118,17 @@ function setupUI() {
       const name = childForm.name.value.trim();
       const age = Number(childForm.age.value);
       const gender = childForm.gender.value;
+      const ageUnit = document.getElementById("ageUnit")?.value || "years";
 
       if (!name || !age || !gender) return;
 
       const data = {
         name,
         age,
+        ageUnit,
         gender,
         parentId: userId,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
       };
 
       if (editId) {
@@ -135,6 +163,22 @@ function openModal(child = null, id = null) {
   form.name.value = child?.name || "";
   form.age.value = child?.age || "";
   form.gender.value = child?.gender || "";
+
+  // Restore age unit toggle
+  const savedUnit = child?.ageUnit || "years";
+  const ageUnitInput = document.getElementById("ageUnit");
+  const ageUnitYears = document.getElementById("ageUnitYears");
+  const ageUnitMonths = document.getElementById("ageUnitMonths");
+  if (ageUnitInput) ageUnitInput.value = savedUnit;
+  if (ageUnitYears && ageUnitMonths) {
+    if (savedUnit === "months") {
+      ageUnitMonths.classList.add("active");
+      ageUnitYears.classList.remove("active");
+    } else {
+      ageUnitYears.classList.add("active");
+      ageUnitMonths.classList.remove("active");
+    }
+  }
 }
 
 function closeModal() {

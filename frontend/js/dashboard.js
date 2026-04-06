@@ -1,8 +1,13 @@
 // dashboard.js
 import { auth, db } from "./firebase.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
+import {
+  onAuthStateChanged,
+  signOut,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  doc,
+  getDoc,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   const dashboard = document.getElementById("dashboardPage");
@@ -19,24 +24,60 @@ document.addEventListener("DOMContentLoaded", () => {
   ====================== */
   const pages = {
     home: `
-      <h1>Welcome back 👋</h1>
-      <div class="cards">
-        <div class="card">
-          <h3>Children</h3>
-          <p>Manage your children profiles</p>
+      <div class="home-page">
+        <h1>Welcome back 👋</h1>
+
+        <div class="home-stats" id="homeStats">
+          <div class="stat-card" data-nav="children">
+            <span class="stat-icon">👶</span>
+            <span class="stat-value" id="statChildren">—</span>
+            <span class="stat-label">Children</span>
+          </div>
+          <div class="stat-card" data-nav="medicines">
+            <span class="stat-icon">💊</span>
+            <span class="stat-value" id="statMedicines">—</span>
+            <span class="stat-label">Active Medicines</span>
+          </div>
+          <div class="stat-card" data-nav="checklist">
+            <span class="stat-icon">✅</span>
+            <span class="stat-value" id="statChecked">—</span>
+            <span class="stat-label">Taken Today</span>
+          </div>
+          <div class="stat-card" data-nav="knowledgebase">
+            <span class="stat-icon">📚</span>
+            <span class="stat-value" id="statArticles">—</span>
+            <span class="stat-label">Articles</span>
+          </div>
         </div>
-        <div class="card">
-          <h3>Medicines</h3>
-          <p>Track medicine schedules</p>
+
+        <div class="home-quick-actions">
+          <h2>Quick Actions</h2>
+          <div class="quick-actions-grid">
+            <button class="quick-action-btn" data-nav="children">
+              <span class="qa-icon">➕</span> Add Child
+            </button>
+            <button class="quick-action-btn" data-nav="medicines">
+              <span class="qa-icon">💊</span> Add Medicine
+            </button>
+            <button class="quick-action-btn" data-nav="addanalysis">
+              <span class="qa-icon">🧪</span> Add Analysis
+            </button>
+            <button class="quick-action-btn" data-nav="checklist">
+              <span class="qa-icon">📋</span> Daily Checklist
+            </button>
+          </div>
         </div>
-        <div class="card">
-          <h3>Checklist</h3>
-          <p>Daily medicine tracking</p>
+
+        <div class="home-recent">
+          <h2>My Children</h2>
+          <div class="recent-children-list" id="recentChildren">
+            <p class="home-empty-hint">Loading...</p>
+          </div>
         </div>
       </div>
     `,
 
-children: `<div class="children-page">
+    children: `<div class="children-page">
   <div class="children-header">
     <h2>My Children</h2>
   </div>
@@ -50,7 +91,15 @@ children: `<div class="children-page">
 
       <form id="childForm">
         <input type="text" id="name" placeholder="Child name" required />
-        <input type="number" id="age" placeholder="Age" required />
+
+        <div class="age-input-group">
+          <input type="number" id="age" placeholder="Age" min="0" required />
+          <div class="age-unit-toggle">
+            <button type="button" id="ageUnitYears" class="active">yrs</button>
+            <button type="button" id="ageUnitMonths">mo</button>
+          </div>
+        </div>
+        <input type="hidden" id="ageUnit" value="years" />
 
         <select id="gender" required>
           <option value="">Select gender</option>
@@ -76,21 +125,39 @@ children: `<div class="children-page">
         <div class="container">
           <h2>Medicine List</h2>
 
-          <div class="medicine-child-filter">
-            <label for="childSelect">Select child</label>
-            <select id="medicineChildSelect">
-              <option value="">— Select child —</option>
-            </select>
+          <div class="medicine-tabs">
+            <button class="tab-btn active" data-tab="child-medicines">💊 Child Medicines</button>
+            <button class="tab-btn" data-tab="my-supplements">🌿 My Supplements</button>
           </div>
 
-          <form id="addMedicineForm">
-            <input type="text" id="medicineName" placeholder="Medicine name" required>
-            <input type="text" id="dosage" placeholder="Dosage" required>
-            <input type="number" id="timesPerDay" placeholder="Times per day" min="1" required>
-            <button type="submit">Add Medicine</button>
-          </form>
+          <div class="tab-content active" data-tab="child-medicines">
+            <div class="medicine-child-filter">
+              <label for="medicineChildSelect">Select child</label>
+              <select id="medicineChildSelect">
+                <option value="">— Select child —</option>
+              </select>
+            </div>
 
-          <ul id="medicineList"></ul>
+            <form id="addMedicineForm">
+              <input type="text" id="medicineName" placeholder="Medicine name" required>
+              <input type="text" id="dosage" placeholder="Dosage" required>
+              <input type="number" id="timesPerDay" placeholder="Times per day" min="1" required>
+              <button type="submit">Add Medicine</button>
+            </form>
+
+            <ul id="medicineList"></ul>
+          </div>
+
+          <div class="tab-content" data-tab="my-supplements">
+            <form id="addSupplementForm">
+              <input type="text" id="supplementName" placeholder="Supplement name" required>
+              <input type="text" id="supplementDosage" placeholder="Dosage" required>
+              <input type="number" id="supplementTimesPerDay" placeholder="Times per day" min="1" required>
+              <button type="submit">Add Supplement</button>
+            </form>
+
+            <ul id="supplementList"></ul>
+          </div>
         </div>
       </div>
     `,
@@ -153,6 +220,24 @@ children: `<div class="children-page">
             <h3>Vaccines Info</h3>
             <p>Basic vaccine education and guidance for parents.</p>
           </button>
+
+          <button class="kb-category-card" data-category="herbal">
+            <span class="kb-icon">🌿</span>
+            <h3>Natural Herbal Beverages</h3>
+            <p>Safe and beneficial herbal drinks for children's health.</p>
+          </button>
+
+          <button class="kb-category-card" data-category="nutrition">
+            <span class="kb-icon">🥗</span>
+            <h3>Child Nutrition Tips</h3>
+            <p>Practical nutrition advice for healthy child development.</p>
+          </button>
+
+          <button class="kb-category-card" data-category="sleep">
+            <span class="kb-icon">😴</span>
+            <h3>Sleep & Development</h3>
+            <p>Understanding sleep patterns and their role in child growth.</p>
+          </button>
         </div>
       </div>
 
@@ -184,10 +269,8 @@ children: `<div class="children-page">
 
     savedarticles: `
 <div class="saved-articles-page">
-  <div class="container">
-    <h2>⭐ Saved Articles</h2>
-    <ul id="savedArticlesList"></ul>
-  </div>
+  <h2>⭐ Saved Articles</h2>
+  <div id="savedArticlesGrid" class="saved-articles-grid"></div>
 </div>
 `,
 
@@ -211,20 +294,13 @@ children: `<div class="children-page">
         <select id="typeSelect">
           <option value="">Select type</option>
           <option value="blood">Blood</option>
-          <option value="urine">Urine</option>
           <option value="vitamin">Vitamin</option>
         </select>
 
         <div id="bloodFields" style="display:none;">
           <h4>Blood Analysis</h4>
           <input type="number" id="hemoglobin" placeholder="Hemoglobin" />
-          <input type="number" id="iron" placeholder="Iron" />
-        </div>
-
-        <div id="urineFields" style="display:none;">
-          <h4>Urine Analysis</h4>
-          <input type="number" id="protein" placeholder="Protein" />
-          <input type="number" id="ph" placeholder="pH" />
+          <input type="number" id="ferritin" name="ferritin" placeholder="Ferritin" />
         </div>
 
         <div id="vitaminFields" style="display:none;">
@@ -235,6 +311,7 @@ children: `<div class="children-page">
 
         <button type="submit">Save Analysis</button>
       </form>
+      <div id="aiSummaryBlock" style="display:none"></div>
 
     </div>
   </div>
@@ -254,7 +331,6 @@ children: `<div class="children-page">
         <select id="typeFilter">
           <option value="">All Types</option>
           <option value="blood">Blood</option>
-          <option value="urine">Urine</option>
           <option value="vitamin">Vitamin</option>
         </select>
       </div>
@@ -291,149 +367,481 @@ children: `<div class="children-page">
 `,
 
     admin: `
-  <div class="admin-page container">
-    <h2>👑 Admin Panel</h2>
-    <p>Manage Knowledge Base Articles</p>
-    <div id="adminContent"></div>
+  <div class="admin-page">
+    <div class="admin-header">
+      <h2>👑 Admin Panel</h2>
+      <button id="adminAddBtn" class="admin-add-btn">➕ Add Article</button>
+    </div>
+    <div class="admin-search-bar">
+      <input id="adminSearch" placeholder="Search articles..." />
+      <select id="adminCategoryFilter">
+        <option value="">All Categories</option>
+        <option value="harmful">Harmful</option>
+        <option value="immunity">Immunity</option>
+        <option value="vaccines">Vaccines</option>
+        <option value="herbal">Herbal</option>
+        <option value="nutrition">Nutrition</option>
+        <option value="sleep">Sleep</option>
+      </select>
+    </div>
+    <div id="adminArticlesList"></div>
   </div>
 `,
 
+    motherhealth: `
+<div class="motherhealth-page">
+  <div class="mh-header">
+    <h2>👩 Mother Health</h2>
+    <p>Your health, your journey</p>
+  </div>
+  <div class="mh-nav-cards">
+    <div class="mh-nav-card" data-page="pregnancy">
+      <span class="mh-icon">🤰</span>
+      <h3>Pregnancy & Period</h3>
+      <p>Track your pregnancy journey and menstrual cycle</p>
+    </div>
+    <div class="mh-nav-card" data-page="medicines">
+      <span class="mh-icon">💊</span>
+      <h3>My Supplements</h3>
+      <p>Manage your vitamins and supplements</p>
+    </div>
+  </div>
+
+  <div class="mh-cards-grid">
+    <div class="mh-card" id="waterIntakeCard">
+      <h3>💧 Daily Water Goal</h3>
+      <label>Daily goal (liters)</label>
+      <input type="number" id="waterLiters" step="0.1" min="0.5" max="5" placeholder="e.g. 2.0" />
+      <p id="waterGlassesDisplay" class="mh-glasses-display"></p>
+      <label>Start hour (0–23)</label>
+      <input type="number" id="waterStartHour" min="0" max="23" placeholder="e.g. 7" />
+      <label>End hour (0–23)</label>
+      <input type="number" id="waterEndHour" min="0" max="23" placeholder="e.g. 22" />
+      <p id="waterError" class="mh-error"></p>
+      <button id="saveWaterBtn">Save</button>
+    </div>
+
+    <div class="mh-card" id="appointmentCard">
+      <h3>🏥 Next Doctor Appointment</h3>
+      <label>Appointment date</label>
+      <input type="date" id="appointmentDate" />
+      <p id="appointmentWarning" class="mh-error"></p>
+      <button id="saveAppointmentBtn">Save</button>
+    </div>
+  </div>
+</div>
+`,
+
+    pregnancy: `
+<div class="pregnancy-page">
+  <div class="pregnancy-header">
+    <h2>🤰 Pregnancy &amp; Period Calendar</h2>
+    <p>Track your pregnancy journey and menstrual cycle</p>
+  </div>
+
+  <div class="pregnancy-info-cards">
+    <div class="pregnancy-info-card">
+      <h3>📋 Overview</h3>
+      <p>Monitor your pregnancy progress and key milestones week by week.</p>
+    </div>
+    <div class="pregnancy-info-card">
+      <h3>📅 This Week</h3>
+      <p>Your baby is growing. Stay hydrated and take your prenatal vitamins.</p>
+    </div>
+    <div class="pregnancy-info-card">
+      <h3>🏆 Milestones</h3>
+      <p>Track important milestones throughout your pregnancy journey.</p>
+    </div>
+    <div class="pregnancy-info-card">
+      <h3>🩺 Symptoms</h3>
+      <textarea id="symptomsTextarea" placeholder="Note your symptoms here..." rows="3" style="width:100%;margin-top:8px;padding:8px;border-radius:8px;border:1px solid #e2e8f0;font-size:13px;resize:vertical;"></textarea>
+      <button id="updateSymptomsBtn" style="margin-top:8px;">Save</button>
+    </div>
+    <div class="pregnancy-info-card">
+      <h3>🤖 AI Advice</h3>
+      <p style="color:#64748b;font-size:14px;">AI-powered pregnancy advice coming soon. Stay tuned!</p>
+    </div>
+  </div>
+
+  <div class="period-calendar-section pregnancy-form-container">
+    <h3>🗓️ Period Calendar</h3>
+
+    <div class="period-inputs">
+      <div>
+        <label for="lastPeriodDate" style="display:block;font-size:13px;color:#64748b;margin-bottom:4px;">Last Period Date</label>
+        <input type="date" id="lastPeriodDate" />
+      </div>
+      <div>
+        <label for="cycleLength" style="display:block;font-size:13px;color:#64748b;margin-bottom:4px;">Cycle Length (21–35 days)</label>
+        <input type="number" id="cycleLength" min="21" max="35" value="28" />
+      </div>
+      <div style="display:flex;align-items:flex-end;">
+        <button id="savePeriodBtn">Save</button>
+      </div>
+    </div>
+
+    <div class="calendar-nav">
+      <button id="calendarPrev">&#8592; Prev</button>
+      <span id="calendarTitle" style="font-weight:600;font-size:16px;color:#1e293b;"></span>
+      <button id="calendarNext">Next &#8594;</button>
+    </div>
+
+    <div id="periodCalendarGrid" class="calendar-grid"></div>
+
+    <div id="nextPeriodInfo" class="next-period-info"></div>
+  </div>
+</div>
+`,
+
+    billing: `
+<div id="billingPage"></div>
+`,
+
     settings: `
-      <h1>⚙️ Settings</h1>
-      <p>User settings will be here</p>
-    `
+<div class="settings-page">
+  <div class="settings-header">
+    <h2>⚙️ Settings</h2>
+    <p>Manage your account and preferences</p>
+  </div>
+
+  <div class="settings-section">
+    <h3>👤 Profile Settings</h3>
+    <div class="settings-field">
+      <label>Display Name</label>
+      <input type="text" id="settingsDisplayName" placeholder="Your name" />
+    </div>
+    <div class="settings-field">
+      <label>Email</label>
+      <input type="email" id="settingsEmail" placeholder="your@email.com" readonly class="readonly-field" />
+      <small style="color:#94a3b8;font-size:12px;">Email cannot be changed here</small>
+    </div>
+    <button id="saveProfileBtn" class="settings-save-btn">Save Profile</button>
+  </div>
+
+  <div class="settings-section">
+    <h3>🔒 Change Password</h3>
+    <div class="settings-field">
+      <label>Current Password</label>
+      <input type="password" id="currentPassword" placeholder="Current password" />
+    </div>
+    <div class="settings-field">
+      <label>New Password</label>
+      <input type="password" id="newPassword" placeholder="New password" />
+    </div>
+    <div class="settings-field">
+      <label>Confirm New Password</label>
+      <input type="password" id="confirmPassword" placeholder="Confirm new password" />
+    </div>
+    <p id="passwordError" class="settings-error" style="display:none;"></p>
+    <button id="changePasswordBtn" class="settings-save-btn">Change Password</button>
+  </div>
+
+  <div class="settings-section">
+    <h3>🔔 Notifications</h3>
+    <div class="settings-toggle-row">
+      <span>Enable Notifications</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="notificationsToggle" />
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <h3>📱 Telegram Notifications</h3>
+    <p style="font-size:13px;color:#94a3b8;">
+      🚧 Telegram notifications are coming soon. Stay tuned!
+    </p>
+  </div>
+
+  <div class="settings-section">
+    <h3>🎨 App Preferences</h3>
+    <div class="settings-field">
+      <label>Language</label>
+      <select id="languageSelect">
+        <option value="en">English</option>
+      </select>
+    </div>
+    <div class="settings-toggle-row">
+      <span>Dark Mode</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="darkModeToggle" />
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="settings-section danger-zone">
+    <h3>⚠️ Danger Zone</h3>
+    <p style="color:#64748b;font-size:14px;margin-bottom:16px;">Permanently delete your account and all associated data.</p>
+    <button id="deleteAccountBtn" class="settings-danger-btn">Delete Account</button>
+  </div>
+
+  <div id="settingsMessage" class="settings-message" style="display:none;"></div>
+</div>
+`,
   };
 
   /* ======================
      DEFAULT PAGE
   ====================== */
   content.innerHTML = pages.home;
+  initHomePage();
 
   /* ======================
    AUTH + ROLE CHECK
 ====================== */
 
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    window.location.href = "../auth/login.html";
-    return;
-  }
-
-  const adminMenu = document.getElementById("adminMenu");
-  if (!adminMenu) return;
-
-  try {
-    const userRef = doc(db, "users", user.uid);
-    const userSnap = await getDoc(userRef);
-
-    console.log("Current UID:", user.uid);
-    console.log("User doc exists:", userSnap.exists());
-
-    if (!userSnap.exists()) {
-      console.log("NO USER DOCUMENT IN FIRESTORE");
-      adminMenu.classList.add("hidden");
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      window.location.href = "../auth/login.html";
       return;
     }
 
-    const role = userSnap.data().role;
-    console.log("Role:", role);
+    const adminMenu = document.getElementById("adminMenu");
+    if (!adminMenu) return;
 
-    if (role === "admin") {
-      adminMenu.classList.remove("hidden");
-    } else {
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      console.log("Current UID:", user.uid);
+      console.log("User doc exists:", userSnap.exists());
+
+      if (!userSnap.exists()) {
+        console.log("NO USER DOCUMENT IN FIRESTORE");
+        adminMenu.classList.add("hidden");
+        return;
+      }
+
+      const role = userSnap.data().role;
+      console.log("Role:", role);
+
+      if (role === "admin") {
+        adminMenu.classList.remove("hidden");
+      } else {
+        adminMenu.classList.add("hidden");
+      }
+    } catch (error) {
+      console.error("Role check error:", error);
       adminMenu.classList.add("hidden");
     }
-
-  } catch (error) {
-    console.error("Role check error:", error);
-    adminMenu.classList.add("hidden");
-  }
-});
+  });
   /* ======================
    MENU NAVIGATION
 ====================== */
-menuItems.forEach(item => {
-  item.addEventListener("click", async () => {
-    menuItems.forEach(i => i.classList.remove("active"));
-    item.classList.add("active");
+  menuItems.forEach((item) => {
+    item.addEventListener("click", async () => {
+      menuItems.forEach((i) => i.classList.remove("active"));
+      item.classList.add("active");
 
-    const pageKey = item.dataset.page;
-    if (!pages[pageKey]) return;
+      const pageKey = item.dataset.page;
+      if (!pages[pageKey]) return;
 
-    // ✅ Old page cleanup
-    if (window.__destroyCurrentPage) {
-      try {
-        window.__destroyCurrentPage();
-      } catch (e) {
-        console.warn(e);
+      // ✅ Old page cleanup
+      if (window.__destroyCurrentPage) {
+        try {
+          window.__destroyCurrentPage();
+        } catch (e) {
+          console.warn(e);
+        }
+        window.__destroyCurrentPage = null;
       }
-      window.__destroyCurrentPage = null;
-    }
 
-    content.innerHTML = pages[pageKey];
+      content.innerHTML = pages[pageKey];
 
-    // 🔥 INIT MODULES
-    if (pageKey === "children") {
-      const module = await import("./children.module.js");
-      module.initChildrenModule();
-    }
+      // Home page stats
+      if (pageKey === "home") initHomePage();
 
-    if (pageKey === "medicines") {
-      const module = await import("./medicine.module.js");
-      module.initMedicineModule();
-    }
-
-    if (pageKey === "checklist") {
-      const module = await import("./daily_checklist.module.js");
-      module.initDailyChecklist();
-
-      if (typeof module.destroyDailyChecklist === "function") {
-        window.__destroyCurrentPage = module.destroyDailyChecklist;
+      // 🔥 INIT MODULES
+      if (pageKey === "children") {
+        const module = await import("./children.module.js");
+        module.initChildrenModule();
       }
-    }
 
-    if (pageKey === "addanalysis") {
-      const module = await import("./addanalysis.module.js");
-      module.initAddAnalysisModule();
-    }
-
-    if (pageKey === "results") {
-      const module = await import("./results.module.js");
-      module.initResultsModule();
-
-      if (typeof module.destroyResultsModule === "function") {
-        window.__destroyCurrentPage = module.destroyResultsModule;
+      if (pageKey === "medicines") {
+        const module = await import("./medicine.module.js");
+        module.initMedicineModule();
       }
-    }
 
-    if (pageKey === "knowledgebase") {
-      const module = await import("./knowledgebase.module.js");
-      module.initKnowledgeBaseModule();
+      if (pageKey === "checklist") {
+        const module = await import("./daily_checklist.module.js");
+        module.initDailyChecklist();
 
-      if (typeof module.destroyKnowledgeBaseModule === "function") {
-        window.__destroyCurrentPage = module.destroyKnowledgeBaseModule;
+        if (typeof module.destroyDailyChecklist === "function") {
+          window.__destroyCurrentPage = module.destroyDailyChecklist;
+        }
       }
-    }
 
-    if (pageKey === "savedarticles") {
-      const module = await import("./savedarticles.module.js");
-      module.initSavedArticlesModule();
-    }
+      if (pageKey === "addanalysis") {
+        const module = await import("./addanalysis.module.js");
+        module.initAddAnalysisModule();
+      }
 
-    if (pageKey === "admin") {
-      const module = await import("./admin.module.js");
-      module.initAdminModule();
-    }
+      if (pageKey === "results") {
+        const module = await import("./results.module.js");
+        module.initResultsModule();
+
+        if (typeof module.destroyResultsModule === "function") {
+          window.__destroyCurrentPage = module.destroyResultsModule;
+        }
+      }
+
+      if (pageKey === "knowledgebase") {
+        const module = await import("./knowledgebase.module.js");
+        module.initKnowledgeBaseModule();
+
+        if (typeof module.destroyKnowledgeBaseModule === "function") {
+          window.__destroyCurrentPage = module.destroyKnowledgeBaseModule;
+        }
+      }
+
+      if (pageKey === "savedarticles") {
+        const module = await import("./savedarticles.module.js");
+        module.initSavedArticlesModule();
+      }
+
+      if (pageKey === "admin") {
+        const module = await import("./admin.module.js");
+        module.initAdminModule();
+      }
+
+      if (pageKey === "motherhealth") {
+        const module = await import("./motherhealth.module.js");
+        module.initMotherHealthModule();
+      }
+
+      if (pageKey === "pregnancy") {
+        const module = await import("./pregnancy.module.js");
+        module.initPregnancyModule();
+      }
+
+      if (pageKey === "billing") {
+        const module = await import("./billing.module.js");
+        module.initBillingModule();
+      }
+
+      if (pageKey === "settings") {
+        const module = await import("./settings.module.js");
+        module.initSettingsModule();
+      }
+    });
   });
-});
+  /* ======================
+     HOME PAGE — STATS & QUICK NAV
+  ====================== */
+  async function initHomePage() {
+    // Quick action buttons → navigate to page
+    document.querySelectorAll("[data-nav]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const target = el.dataset.nav;
+        const menuItem = dashboard.querySelector(
+          `.menu-item[data-page="${target}"]`,
+        );
+        if (menuItem) menuItem.click();
+      });
+    });
+
+    // Load stats from Firestore
+    try {
+      const { collection, query, where, getDocs } =
+        await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+
+      const user = auth.currentUser;
+      if (!user) return;
+
+      // Children count
+      const childSnap = await getDocs(
+        query(collection(db, "children"), where("parentId", "==", user.uid)),
+      );
+      const childCount = childSnap.size;
+      const statChildren = document.getElementById("statChildren");
+      if (statChildren) statChildren.textContent = childCount;
+
+      // Medicines count
+      const medSnap = await getDocs(
+        query(
+          collection(db, "medicine_list"),
+          where("parentId", "==", user.uid),
+        ),
+      );
+      const statMedicines = document.getElementById("statMedicines");
+      if (statMedicines) statMedicines.textContent = medSnap.size;
+
+      // Today's checklist taken count
+      const today = new Date().toISOString().split("T")[0];
+      const checkSnap = await getDocs(
+        query(
+          collection(db, "checklist_logs"),
+          where("parentId", "==", user.uid),
+          where("date", "==", today),
+          where("taken", "==", true),
+        ),
+      );
+      const statChecked = document.getElementById("statChecked");
+      if (statChecked) statChecked.textContent = checkSnap.size;
+
+      // Articles count
+      const artSnap = await getDocs(collection(db, "knowledge_base"));
+      const statArticles = document.getElementById("statArticles");
+      if (statArticles) statArticles.textContent = artSnap.size;
+
+      // Recent children list
+      const recentEl = document.getElementById("recentChildren");
+      if (recentEl) {
+        if (childCount === 0) {
+          recentEl.innerHTML = `<p class="home-empty-hint">No children added yet. Click "Add Child" to get started.</p>`;
+        } else {
+          recentEl.innerHTML = "";
+          childSnap.forEach((docSnap) => {
+            const c = docSnap.data();
+            const ageLabel =
+              c.ageUnit === "months" ? `${c.age} mo` : `${c.age} yrs`;
+            const initial = (c.name || "?")[0].toUpperCase();
+            const item = document.createElement("div");
+            item.className = "recent-child-item";
+            item.innerHTML = `
+              <div class="recent-child-avatar">${initial}</div>
+              <div>
+                <div class="recent-child-name">${c.name}</div>
+                <div class="recent-child-meta">${ageLabel} · ${c.gender || ""}</div>
+              </div>
+            `;
+            recentEl.appendChild(item);
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Home stats error:", e);
+    }
+  }
+
   /* ======================
      LOGOUT
   ====================== */
   if (logoutBtn) {
-    logoutBtn.addEventListener("click", async () => {
-      await signOut(auth);
-      window.location.href = "../index.html";
+    logoutBtn.addEventListener("click", () => {
+      const modal = document.getElementById("logoutModal");
+      if (modal) modal.classList.remove("hidden");
+    });
+
+    document
+      .getElementById("logoutConfirmYes")
+      ?.addEventListener("click", async () => {
+        await signOut(auth);
+        window.location.href = "../index.html";
+      });
+
+    document
+      .getElementById("logoutConfirmNo")
+      ?.addEventListener("click", () => {
+        document.getElementById("logoutModal")?.classList.add("hidden");
+      });
+
+    document.getElementById("logoutModal")?.addEventListener("click", (e) => {
+      if (e.target === document.getElementById("logoutModal")) {
+        document.getElementById("logoutModal").classList.add("hidden");
+      }
     });
   }
 });
-

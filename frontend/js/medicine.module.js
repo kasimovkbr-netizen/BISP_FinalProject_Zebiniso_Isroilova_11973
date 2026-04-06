@@ -7,30 +7,78 @@ import {
   deleteDoc,
   query,
   where,
-  onSnapshot
+  onSnapshot,
+  serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { toast } from "./toast.js";
 
 let userId = null;
 let unsubscribe = null;
+let unsubscribeSupplements = null;
 let deleteTargetId = null;
 
 /* ======================
    INIT
 ====================== */
 export function initMedicineModule() {
-  onAuthStateChanged(auth, user => {
+  onAuthStateChanged(auth, (user) => {
     if (!user) return;
 
     userId = user.uid;
 
+    setupTabs();
     setupMedicineForm();
-    setupConfirmModal();      // global confirmModal
-    loadChildrenDropdown();   // realtime dropdown + auto refresh list
-    setupChildFilter();       // change filter
-    loadMedicineList("");     // default: empty until child selected
+    setupConfirmModal(); // global confirmModal
+    loadChildrenDropdown(); // realtime dropdown + auto refresh list
+    setupChildFilter(); // change filter
+    loadMedicineList(""); // default: empty until child selected
+    loadSupplements(userId);
+    setupSupplementForm();
   });
+}
+
+/* ======================
+   TABS
+====================== */
+export function setupTabs() {
+  const tabBtns = document.querySelectorAll(".tab-btn");
+  tabBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const tab = btn.dataset.tab;
+      tabBtns.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+
+      if (tab === "child-medicines") {
+        showChildMedicinesTab();
+      } else if (tab === "my-supplements") {
+        showSupplementsTab();
+      }
+    });
+  });
+}
+
+export function showChildMedicinesTab() {
+  const childTab = document.querySelector(
+    '.tab-content[data-tab="child-medicines"]',
+  );
+  const suppTab = document.querySelector(
+    '.tab-content[data-tab="my-supplements"]',
+  );
+  if (childTab) childTab.classList.add("active");
+  if (suppTab) suppTab.classList.remove("active");
+}
+
+export function showSupplementsTab() {
+  const childTab = document.querySelector(
+    '.tab-content[data-tab="child-medicines"]',
+  );
+  const suppTab = document.querySelector(
+    '.tab-content[data-tab="my-supplements"]',
+  );
+  if (childTab) childTab.classList.remove("active");
+  if (suppTab) suppTab.classList.add("active");
 }
 
 /* ======================
@@ -45,13 +93,16 @@ function setupMedicineForm() {
 
     const name = document.getElementById("medicineName").value.trim();
     const dosage = document.getElementById("dosage").value.trim();
-    const timesPerDay = parseInt(document.getElementById("timesPerDay").value, 10);
+    const timesPerDay = parseInt(
+      document.getElementById("timesPerDay").value,
+      10,
+    );
 
     const childSelect = document.getElementById("medicineChildSelect");
     const childId = childSelect ? childSelect.value : "";
 
     if (!childId) {
-      alert("Please select a child before adding medicine.");
+      toast("Please select a child before adding medicine.", "warning");
       return;
     }
 
@@ -63,13 +114,127 @@ function setupMedicineForm() {
       name,
       dosage,
       timesPerDay,
-      createdAt: new Date()
+      createdAt: new Date(),
     });
 
     form.reset();
-    // selectni o'zgartirmaymiz
     loadMedicineList(childId);
   };
+}
+
+/* ======================
+   SUPPLEMENT FORM
+====================== */
+function setupSupplementForm() {
+  const form = document.getElementById("addSupplementForm");
+  if (!form) return;
+
+  // Remove any previous listener to avoid duplicates
+  form.onsubmit = null;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    if (!userId) return;
+
+    const nameEl = document.getElementById("supplementName");
+    const dosageEl = document.getElementById("supplementDosage");
+    const timesEl = document.getElementById("supplementTimesPerDay");
+
+    const name = nameEl?.value.trim();
+    const dosage = dosageEl?.value.trim();
+    const timesPerDay = parseInt(timesEl?.value, 10);
+
+    if (!name || !dosage || !timesPerDay || timesPerDay < 1) return;
+
+    try {
+      await addSupplement(userId, { name, dosage, timesPerDay });
+      form.reset();
+    } catch (err) {
+      console.error("Add supplement error:", err);
+    }
+  });
+}
+
+/* ======================
+   SUPPLEMENTS — LOAD
+====================== */
+export function loadSupplements(uid) {
+  const ul = document.getElementById("supplementList");
+  if (!ul || !uid) return;
+
+  if (unsubscribeSupplements) unsubscribeSupplements();
+
+  const q = query(
+    collection(db, "supplements_list"),
+    where("userId", "==", uid),
+  );
+
+  unsubscribeSupplements = onSnapshot(q, (snapshot) => {
+    ul.innerHTML = "";
+
+    if (snapshot.empty) {
+      ul.style.display = "none";
+      return;
+    }
+    ul.style.display = "flex";
+
+    snapshot.forEach((docItem) => {
+      const data = docItem.data();
+      const li = document.createElement("li");
+
+      li.innerHTML = `
+        <span class="text">
+          ${escapeHtml(data.name)} — ${escapeHtml(data.dosage)} (${Number(data.timesPerDay)}x/day)
+        </span>
+        <div class="actions">
+          <button class="deleteBtn">Delete</button>
+        </div>
+      `;
+
+      li.querySelector(".deleteBtn").onclick = () => {
+        deleteSupplement(docItem.id, data.name);
+      };
+
+      ul.appendChild(li);
+    });
+  });
+}
+
+/* ======================
+   SUPPLEMENTS — ADD
+====================== */
+export async function addSupplement(uid, data) {
+  await addDoc(collection(db, "supplements_list"), {
+    userId: uid,
+    name: data.name,
+    dosage: data.dosage,
+    timesPerDay: data.timesPerDay,
+    createdAt: serverTimestamp(),
+  });
+}
+
+/* ======================
+   SUPPLEMENTS — DELETE
+====================== */
+export function deleteSupplement(id, name) {
+  deleteTargetId = id;
+
+  const modal = document.getElementById("confirmModal");
+  const text = document.getElementById("confirmText");
+  if (text) text.textContent = `Delete "${name}"?`;
+  if (modal) modal.classList.remove("hidden");
+
+  // Wire up yes button for supplement deletion
+  const yesBtn = document.getElementById("confirmYes");
+  if (yesBtn) {
+    yesBtn.onclick = async () => {
+      if (!deleteTargetId) return;
+      await deleteDoc(doc(db, "supplements_list", deleteTargetId));
+      modal.classList.add("hidden");
+      deleteTargetId = null;
+    };
+  }
 }
 
 /* ======================
@@ -105,8 +270,6 @@ function setupConfirmModal() {
 
 /* ======================
    CHILD DROPDOWN LOAD (REAL-TIME)
-   ✅ deleted child selectda qolib ketmasin
-   ✅ har safar hozirgi tanlov bo'yicha list refresh
 ====================== */
 function loadChildrenDropdown() {
   const childSelect = document.getElementById("medicineChildSelect");
@@ -115,13 +278,13 @@ function loadChildrenDropdown() {
   const childrenRef = collection(db, "children");
   const q = query(childrenRef, where("parentId", "==", userId));
 
-  onSnapshot(q, snapshot => {
+  onSnapshot(q, (snapshot) => {
     const prevSelected = childSelect.value;
 
     childSelect.innerHTML = `<option value="">— Select child —</option>`;
 
     const existingIds = new Set();
-    snapshot.forEach(docItem => {
+    snapshot.forEach((docItem) => {
       existingIds.add(docItem.id);
 
       const data = docItem.data();
@@ -131,14 +294,12 @@ function loadChildrenDropdown() {
       childSelect.appendChild(option);
     });
 
-    // Agar oldingi tanlov endi mavjud bo'lmasa -> reset
     if (prevSelected && !existingIds.has(prevSelected)) {
       childSelect.value = "";
     } else {
-      childSelect.value = prevSelected; // saqlab qolamiz
+      childSelect.value = prevSelected;
     }
 
-    // Dorilarni har doim hozirgi tanlov bo'yicha refresh qilamiz
     loadMedicineList(childSelect.value);
   });
 }
@@ -157,7 +318,6 @@ function setupChildFilter() {
 
 /* ======================
    REALTIME MEDICINE LIST
-   ✅ child tanlanmasa ro'yxat bo'sh
 ====================== */
 function loadMedicineList(selectedChildId = "") {
   const ul = document.getElementById("medicineList");
@@ -165,7 +325,6 @@ function loadMedicineList(selectedChildId = "") {
 
   if (unsubscribe) unsubscribe();
 
-  // child tanlanmasa: list bo'sh
   if (!selectedChildId) {
     ul.innerHTML = "";
     return;
@@ -174,13 +333,19 @@ function loadMedicineList(selectedChildId = "") {
   const q = query(
     collection(db, "medicine_list"),
     where("parentId", "==", userId),
-    where("childId", "==", selectedChildId)
+    where("childId", "==", selectedChildId),
   );
 
-  unsubscribe = onSnapshot(q, snapshot => {
+  unsubscribe = onSnapshot(q, (snapshot) => {
     ul.innerHTML = "";
 
-    snapshot.forEach(docItem => {
+    if (snapshot.empty) {
+      ul.style.display = "none";
+    } else {
+      ul.style.display = "flex";
+    }
+
+    snapshot.forEach((docItem) => {
       const data = docItem.data();
       const li = document.createElement("li");
 
@@ -209,7 +374,8 @@ function loadMedicineList(selectedChildId = "") {
         `;
 
         const form = li.querySelector(".editForm");
-        form.querySelector(".cancelBtn").onclick = () => loadMedicineList(selectedChildId);
+        form.querySelector(".cancelBtn").onclick = () =>
+          loadMedicineList(selectedChildId);
 
         form.onsubmit = async (e) => {
           e.preventDefault();
@@ -218,7 +384,7 @@ function loadMedicineList(selectedChildId = "") {
           await updateDoc(doc(db, "medicine_list", docItem.id), {
             name: inputs[0].value.trim(),
             dosage: inputs[1].value.trim(),
-            timesPerDay: parseInt(inputs[2].value, 10)
+            timesPerDay: parseInt(inputs[2].value, 10),
           });
         };
       };
@@ -231,6 +397,17 @@ function loadMedicineList(selectedChildId = "") {
         const text = document.getElementById("confirmText");
         if (text) text.textContent = `Delete "${data.name}"?`;
         if (modal) modal.classList.remove("hidden");
+
+        // Re-wire yes button for medicine deletion
+        const yesBtn = document.getElementById("confirmYes");
+        if (yesBtn) {
+          yesBtn.onclick = async () => {
+            if (!deleteTargetId) return;
+            await deleteDoc(doc(db, "medicine_list", deleteTargetId));
+            modal.classList.add("hidden");
+            deleteTargetId = null;
+          };
+        }
       };
 
       ul.appendChild(li);

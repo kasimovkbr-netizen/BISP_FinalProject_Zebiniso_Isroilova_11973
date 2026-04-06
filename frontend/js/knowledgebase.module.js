@@ -7,7 +7,7 @@ import {
   getDocs,
   addDoc,
   deleteDoc,
-  doc
+  doc,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 let currentCategory = "";
@@ -59,11 +59,11 @@ function attachDelegatedListeners() {
     }
 
     if (articleBtn) {
-  const articleId = articleBtn.dataset.id;
-  const article = currentArticles.find((a) => a.id === articleId);
-  if (article) await renderArticleDetail(article);
-  return;
-}
+      const articleId = articleBtn.dataset.id;
+      const article = currentArticles.find((a) => a.id === articleId);
+      if (article) await renderArticleDetail(article);
+      return;
+    }
 
     if (backHomeBtn) {
       showHomeView();
@@ -88,18 +88,28 @@ async function loadArticlesByCategory(category) {
   title.textContent = getCategoryTitle(category);
 
   try {
-    const q = query(
-      collection(db, "knowledge_base"),
-      where("category", "==", category),
-      where("status", "==", "published"),
-      orderBy("order", "asc")
-    );
-
-    const snap = await getDocs(q);
+    let snap;
+    try {
+      // Try with status + order filters first (requires Firestore index)
+      const q = query(
+        collection(db, "knowledge_base"),
+        where("category", "==", category),
+        where("status", "==", "published"),
+        orderBy("order", "asc"),
+      );
+      snap = await getDocs(q);
+    } catch {
+      // Fallback: query only by category (no index needed)
+      const q = query(
+        collection(db, "knowledge_base"),
+        where("category", "==", category),
+      );
+      snap = await getDocs(q);
+    }
 
     currentArticles = snap.docs.map((docSnap) => ({
       id: docSnap.id,
-      ...docSnap.data()
+      ...docSnap.data(),
     }));
 
     renderArticlesList();
@@ -126,12 +136,16 @@ function renderArticlesList() {
     return;
   }
 
-  listContainer.innerHTML = currentArticles.map((article) => `
+  listContainer.innerHTML = currentArticles
+    .map(
+      (article) => `
     <button class="kb-article-card" data-id="${article.id}" type="button">
       <h4>${escapeHtml(article.title)}</h4>
       <p>${escapeHtml(article.summary || "")}</p>
     </button>
-  `).join("");
+  `,
+    )
+    .join("");
 }
 
 async function renderArticleDetail(article) {
@@ -154,32 +168,29 @@ async function renderArticleDetail(article) {
   }
 
   // Bookmark button qo‘shamiz
-let bookmarkBtn = document.getElementById("kbBookmarkBtn");
+  let bookmarkBtn = document.getElementById("kbBookmarkBtn");
 
-if (!bookmarkBtn) {
-  bookmarkBtn = document.createElement("button");
-  bookmarkBtn.id = "kbBookmarkBtn";
-  bookmarkBtn.className = "kb-bookmark-btn";
-  bookmarkBtn.style.marginBottom = "15px";
+  if (!bookmarkBtn) {
+    bookmarkBtn = document.createElement("button");
+    bookmarkBtn.id = "kbBookmarkBtn";
+    bookmarkBtn.className = "kb-bookmark-btn";
 
-  // title elementdan keyin qo‘shamiz
-  title.insertAdjacentElement("afterend", bookmarkBtn);
-}
+    // title elementdan keyin qo‘shamiz
+    title.insertAdjacentElement("afterend", bookmarkBtn);
+  }
 
-// Avval bookmark qilinganmi tekshiramiz
-const existingBookmark = await isBookmarked(article.id);
+  // Avval bookmark qilinganmi tekshiramiz
+  const existingBookmark = await isBookmarked(article.id);
 
-bookmarkBtn.textContent = existingBookmark
-  ? "⭐ Remove Bookmark"
-  : "⭐ Save Article";
-
-bookmarkBtn.onclick = async () => {
-  const saved = await toggleBookmark(article.id);
-
-  bookmarkBtn.textContent = saved
+  bookmarkBtn.textContent = existingBookmark
     ? "⭐ Remove Bookmark"
     : "⭐ Save Article";
-};
+
+  bookmarkBtn.onclick = async () => {
+    const saved = await toggleBookmark(article.id);
+
+    bookmarkBtn.textContent = saved ? "⭐ Remove Bookmark" : "⭐ Save Article";
+  };
 
   content.innerHTML = formatContent(article.content || "");
   showDetailView();
@@ -213,6 +224,9 @@ function getCategoryTitle(category) {
   if (category === "harmful") return "Harmful Medicines";
   if (category === "immunity") return "Immunity Tips";
   if (category === "vaccines") return "Vaccines Info";
+  if (category === "herbal") return "Natural Herbal Beverages";
+  if (category === "nutrition") return "Child Nutrition Tips";
+  if (category === "sleep") return "Sleep & Development";
   return "Knowledge Base";
 }
 
@@ -240,7 +254,7 @@ async function isBookmarked(articleId) {
   const q = query(
     collection(db, "user_bookmarks"),
     where("userId", "==", user.uid),
-    where("articleId", "==", articleId)
+    where("articleId", "==", articleId),
   );
 
   const snap = await getDocs(q);
@@ -261,7 +275,7 @@ async function toggleBookmark(articleId) {
     await addDoc(collection(db, "user_bookmarks"), {
       userId: user.uid,
       articleId: articleId,
-      savedAt: new Date()
+      savedAt: new Date(),
     });
     return true;
   }

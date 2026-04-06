@@ -8,7 +8,7 @@ import {
   where,
   onSnapshot,
   getDocs,
-  serverTimestamp
+  serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -25,7 +25,7 @@ const today = new Date().toISOString().split("T")[0];
    INIT
 ====================== */
 export function initDailyChecklist() {
-  onAuthStateChanged(auth, user => {
+  onAuthStateChanged(auth, (user) => {
     if (!user) return;
 
     userId = user.uid;
@@ -58,7 +58,7 @@ function loadChildrenDropdown() {
   // ✅ old listener bo‘lsa o‘chirib yuboramiz
   if (unsubscribeChildren) unsubscribeChildren();
 
-  unsubscribeChildren = onSnapshot(q, snap => {
+  unsubscribeChildren = onSnapshot(q, (snap) => {
     // ✅ Agar sahifa DOM’dan ketgan bo‘lsa, listener’ni to‘xtatamiz
     const stillThere = document.getElementById("checklistChildSelect");
     if (!stillThere) {
@@ -67,9 +67,9 @@ function loadChildrenDropdown() {
       return;
     }
 
-    select.innerHTML = `<option value="">— All children —</option>`;
+    select.innerHTML = `<option value="">— Select child —</option>`;
 
-    snap.forEach(d => {
+    snap.forEach((d) => {
       const opt = document.createElement("option");
       opt.value = d.id;
       opt.textContent = d.data().name;
@@ -87,7 +87,12 @@ function setupChildFilter() {
 
     cleanupListeners();
 
-    // ✅ All children rejimi: selectedChildId = "" bo‘lsa — hammasi chiqadi
+    // ✅ Bola tanlanmagan holat: checklist yashirin
+    if (select.value === "") {
+      toggleStats(false);
+      return;
+    }
+
     toggleStats(true);
     loadChecklistRealtime();
     drawWeeklyChart();
@@ -109,21 +114,26 @@ function cleanupListeners() {
 /* ======================
    DAILY CHECKLIST
 ====================== */
+const TIME_SLOTS = ["Morning", "Afternoon", "Evening", "Night"];
+
 function loadChecklistRealtime() {
   let ul = document.getElementById("dailyChecklist");
   if (!ul) return;
 
-  let q = query(collection(db, "medicine_list"), where("parentId", "==", userId));
+  let q = query(
+    collection(db, "medicine_list"),
+    where("parentId", "==", userId),
+  );
 
   if (selectedChildId) {
     q = query(
       collection(db, "medicine_list"),
       where("parentId", "==", userId),
-      where("childId", "==", selectedChildId)
+      where("childId", "==", selectedChildId),
     );
   }
 
-  unsubscribeChecklist = onSnapshot(q, async snap => {
+  unsubscribeChecklist = onSnapshot(q, async (snap) => {
     // ✅ Har callbackda qayta tekshiramiz: DOM bormi?
     ul = document.getElementById("dailyChecklist");
     if (!ul) {
@@ -136,45 +146,52 @@ function loadChecklistRealtime() {
 
     for (const med of snap.docs) {
       const data = med.data();
+      const timesPerDay = Number(data.timesPerDay) || 1;
+      const slots = TIME_SLOTS.slice(0, timesPerDay);
 
-      const logQ = query(
-        collection(db, "medicine_logs"),
-        where("parentId", "==", userId),
-        where("medicineId", "==", med.id),
-        where("date", "==", today)
-      );
+      for (const slot of slots) {
+        // Query log for this specific medicine + date + time_slot
+        const logQ = query(
+          collection(db, "medicine_logs"),
+          where("parentId", "==", userId),
+          where("medicineId", "==", med.id),
+          where("date", "==", today),
+          where("time_slot", "==", slot),
+        );
 
-      const logSnap = await getDocs(logQ);
-      const taken = !logSnap.empty && logSnap.docs[0].data().taken;
+        const logSnap = await getDocs(logQ);
+        const taken = !logSnap.empty && logSnap.docs[0].data().taken;
 
-      const li = document.createElement("li");
-      li.innerHTML = `
-        <label>${data.name} – ${data.dosage}</label>
-        <input type="checkbox" ${taken ? "checked" : ""}>
-      `;
+        const li = document.createElement("li");
+        li.innerHTML = `
+          <label>${data.name} – ${data.dosage} (${slot})</label>
+          <input type="checkbox" ${taken ? "checked" : ""}>
+        `;
 
-      li.querySelector("input").onchange = async e => {
-        if (logSnap.empty) {
-          await addDoc(collection(db, "medicine_logs"), {
-            parentId: userId,
-            medicineId: med.id,
-            childId: data.childId || "",
-            date: today,
-            taken: e.target.checked,
-            updatedAt: serverTimestamp()
-          });
-        } else {
-          await updateDoc(doc(db, "medicine_logs", logSnap.docs[0].id), {
-            taken: e.target.checked,
-            updatedAt: serverTimestamp()
-          });
-        }
+        li.querySelector("input").onchange = async (e) => {
+          if (logSnap.empty) {
+            await addDoc(collection(db, "medicine_logs"), {
+              parentId: userId,
+              medicineId: med.id,
+              childId: data.childId || "",
+              date: today,
+              time_slot: slot,
+              taken: e.target.checked,
+              updatedAt: serverTimestamp(),
+            });
+          } else {
+            await updateDoc(doc(db, "medicine_logs", logSnap.docs[0].id), {
+              taken: e.target.checked,
+              updatedAt: serverTimestamp(),
+            });
+          }
 
-        drawWeeklyChart();
-        checkMissedYesterday();
-      };
+          drawWeeklyChart();
+          checkMissedYesterday();
+        };
 
-      ul.appendChild(li);
+        ul.appendChild(li);
+      }
     }
   });
 }
@@ -193,7 +210,7 @@ async function checkMissedYesterday() {
   let q = query(
     collection(db, "medicine_logs"),
     where("parentId", "==", userId),
-    where("date", "==", yDate)
+    where("date", "==", yDate),
   );
 
   if (selectedChildId) {
@@ -201,13 +218,18 @@ async function checkMissedYesterday() {
       collection(db, "medicine_logs"),
       where("parentId", "==", userId),
       where("childId", "==", selectedChildId),
-      where("date", "==", yDate)
+      where("date", "==", yDate),
     );
   }
 
   const snap = await getDocs(q);
 
-  if (snap.empty || snap.docs.every(d => d.data().taken === false)) {
+  if (snap.empty) {
+    warning.classList.add("hidden");
+    return;
+  }
+  if (snap.docs.every((d) => d.data().taken === false)) {
+    warning.innerHTML = `⚠️ Yesterday you missed your medicines`;
     warning.classList.remove("hidden");
   } else {
     warning.classList.add("hidden");
@@ -226,23 +248,30 @@ async function drawWeeklyChart() {
 
   if (chartInstance) chartInstance.destroy();
 
-  const days = getLast7Days();
+  const isodays = getLast7DatesISO();
+  const labels = getLast7Days();
   const values = [];
 
-  let medQ = query(collection(db, "medicine_list"), where("parentId", "==", userId));
+  let medQ = query(
+    collection(db, "medicine_list"),
+    where("parentId", "==", userId),
+  );
 
   if (selectedChildId) {
     medQ = query(
       collection(db, "medicine_list"),
       where("parentId", "==", userId),
-      where("childId", "==", selectedChildId)
+      where("childId", "==", selectedChildId),
     );
   }
 
   const medsSnap = await getDocs(medQ);
-  const totalMedicines = medsSnap.size;
+  const totalMedicines = medsSnap.docs.reduce(
+    (sum, d) => sum + (Number(d.data().timesPerDay) || 1),
+    0,
+  );
 
-  for (const day of days) {
+  for (const day of isodays) {
     if (totalMedicines === 0) {
       values.push(0);
       continue;
@@ -251,7 +280,7 @@ async function drawWeeklyChart() {
     let logQ = query(
       collection(db, "medicine_logs"),
       where("parentId", "==", userId),
-      where("date", "==", day)
+      where("date", "==", day),
     );
 
     if (selectedChildId) {
@@ -259,12 +288,12 @@ async function drawWeeklyChart() {
         collection(db, "medicine_logs"),
         where("parentId", "==", userId),
         where("childId", "==", selectedChildId),
-        where("date", "==", day)
+        where("date", "==", day),
       );
     }
 
     const snap = await getDocs(logQ);
-    const taken = snap.docs.filter(d => d.data().taken).length;
+    const taken = snap.docs.filter((d) => d.data().taken).length;
 
     values.push(Math.round((taken / totalMedicines) * 100));
   }
@@ -272,13 +301,20 @@ async function drawWeeklyChart() {
   chartInstance = new Chart(ctx, {
     type: "bar",
     data: {
-      labels: days,
-      datasets: [{ label: "% Taken", data: values }]
+      labels: labels,
+      datasets: [{ label: "% Taken", data: values }],
     },
     options: {
       responsive: true,
-      scales: { y: { beginAtZero: true, max: 100 } }
-    }
+      scales: { y: { beginAtZero: true, max: 100 } },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: (context) => `${context.parsed.y}% of medicines taken`,
+          },
+        },
+      },
+    },
   });
 }
 
@@ -302,6 +338,19 @@ function toggleStats(show) {
    HELPER
 ====================== */
 function getLast7Days() {
+  const days = [];
+  const d = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const day = new Date(d);
+    day.setDate(d.getDate() - i);
+    days.push(
+      day.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    );
+  }
+  return days;
+}
+
+function getLast7DatesISO() {
   const days = [];
   const d = new Date();
   for (let i = 6; i >= 0; i--) {
