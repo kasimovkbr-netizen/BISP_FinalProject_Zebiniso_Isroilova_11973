@@ -1,17 +1,17 @@
 // motherhealth.module.js
-import { auth, db } from "./firebase.js";
-import {
-  doc, getDoc, setDoc, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+// Requirements: 5.9
+import { supabase } from "./supabase.js";
 
 /* ── Navigation cards ─────────────────────────────────────────────────────── */
 function initNavCards() {
   const cards = document.querySelectorAll(".mh-nav-card");
-  cards.forEach(card => {
+  cards.forEach((card) => {
     card.addEventListener("click", () => {
       const targetPage = card.dataset.page;
       if (!targetPage) return;
-      const menuItem = document.querySelector(`.menu-item[data-page="${targetPage}"]`);
+      const menuItem = document.querySelector(
+        `.menu-item[data-page="${targetPage}"]`,
+      );
       if (menuItem) menuItem.click();
     });
   });
@@ -22,29 +22,33 @@ export function calculateGlasses(liters) {
   return Math.round(liters * 4);
 }
 
-async function initWaterIntakeCard() {
-  const user = auth.currentUser;
-  if (!user) return;
-
-  const litersInput   = document.getElementById("waterLiters");
-  const startInput    = document.getElementById("waterStartHour");
-  const endInput      = document.getElementById("waterEndHour");
+async function initWaterIntakeCard(userId) {
+  const litersInput = document.getElementById("waterLiters");
+  const startInput = document.getElementById("waterStartHour");
+  const endInput = document.getElementById("waterEndHour");
   const glassesDisplay = document.getElementById("waterGlassesDisplay");
-  const errorEl       = document.getElementById("waterError");
-  const saveBtn       = document.getElementById("saveWaterBtn");
+  const errorEl = document.getElementById("waterError");
+  const saveBtn = document.getElementById("saveWaterBtn");
 
   if (!litersInput) return;
 
   // Load existing data
   try {
-    const snap = await getDoc(doc(db, "water_intake", user.uid));
-    if (snap.exists()) {
-      const d = snap.data();
-      litersInput.value  = d.dailyLiters  ?? "";
-      startInput.value   = d.startHour    ?? "";
-      endInput.value     = d.endHour      ?? "";
-      if (d.dailyLiters) {
-        glassesDisplay.textContent = `≈ ${calculateGlasses(d.dailyLiters)} glasses per day`;
+    const { data, error } = await supabase
+      .from("water_intake")
+      .select("*")
+      .eq("user_id", userId)
+      .single();
+
+    if (error && error.code !== "PGRST116") {
+      console.error("Water intake load error:", error);
+    }
+    if (data) {
+      litersInput.value = data.daily_liters ?? "";
+      startInput.value = data.start_hour ?? "";
+      endInput.value = data.end_hour ?? "";
+      if (data.daily_liters) {
+        glassesDisplay.textContent = `≈ ${calculateGlasses(data.daily_liters)} glasses per day`;
       }
     }
   } catch (e) {
@@ -63,16 +67,16 @@ async function initWaterIntakeCard() {
 
   // Save
   saveBtn?.addEventListener("click", async () => {
-    const dailyLiters = parseFloat(litersInput.value);
-    const startHour   = parseInt(startInput.value, 10);
-    const endHour     = parseInt(endInput.value, 10);
+    const daily_liters = parseFloat(litersInput.value);
+    const start_hour = parseInt(startInput.value, 10);
+    const end_hour = parseInt(endInput.value, 10);
 
-    if (isNaN(dailyLiters) || dailyLiters < 0.5 || dailyLiters > 5) {
+    if (isNaN(daily_liters) || daily_liters < 0.5 || daily_liters > 5) {
       errorEl.textContent = "Please enter a valid daily goal (0.5–5 liters)";
       errorEl.style.display = "block";
       return;
     }
-    if (isNaN(startHour) || isNaN(endHour) || endHour <= startHour) {
+    if (isNaN(start_hour) || isNaN(end_hour) || end_hour <= start_hour) {
       errorEl.textContent = "End time must be after start time";
       errorEl.style.display = "block";
       return;
@@ -80,15 +84,24 @@ async function initWaterIntakeCard() {
     errorEl.style.display = "none";
 
     try {
-      await setDoc(doc(db, "water_intake", user.uid), {
-        userId: user.uid,
-        dailyLiters,
-        startHour,
-        endHour,
-        updatedAt: serverTimestamp()
-      });
+      const { error } = await supabase
+        .from("water_intake")
+        .upsert(
+          {
+            user_id: userId,
+            daily_liters,
+            start_hour,
+            end_hour,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" },
+        );
+
+      if (error) throw error;
       saveBtn.textContent = "✅ Saved";
-      setTimeout(() => { saveBtn.textContent = "Save"; }, 1500);
+      setTimeout(() => {
+        saveBtn.textContent = "Save";
+      }, 1500);
     } catch (e) {
       console.error("Water intake save error:", e);
       errorEl.textContent = "Failed to save. Please try again.";
@@ -98,21 +111,26 @@ async function initWaterIntakeCard() {
 }
 
 /* ── Doctor Appointment Card ──────────────────────────────────────────────── */
-async function initAppointmentCard() {
-  const user = auth.currentUser;
-  if (!user) return;
-
-  const dateInput  = document.getElementById("appointmentDate");
-  const warningEl  = document.getElementById("appointmentWarning");
-  const saveBtn    = document.getElementById("saveAppointmentBtn");
+async function initAppointmentCard(userId) {
+  const dateInput = document.getElementById("appointmentDate");
+  const warningEl = document.getElementById("appointmentWarning");
+  const saveBtn = document.getElementById("saveAppointmentBtn");
 
   if (!dateInput) return;
 
   // Load existing data
   try {
-    const snap = await getDoc(doc(db, "appointments", user.uid));
-    if (snap.exists() && snap.data().appointmentDate) {
-      dateInput.value = snap.data().appointmentDate;
+    const { data, error } = await supabase
+      .from("appointments")
+      .select("appointment_date")
+      .eq("user_id", userId)
+      .single();
+
+    if (error && error.code !== "PGRST116") {
+      console.error("Appointment load error:", error);
+    }
+    if (data?.appointment_date) {
+      dateInput.value = data.appointment_date;
     }
   } catch (e) {
     console.error("Appointment load error:", e);
@@ -120,8 +138,8 @@ async function initAppointmentCard() {
 
   // Save
   saveBtn?.addEventListener("click", async () => {
-    const appointmentDate = dateInput.value;
-    if (!appointmentDate) {
+    const appointment_date = dateInput.value;
+    if (!appointment_date) {
       warningEl.textContent = "Please select a date";
       warningEl.style.display = "block";
       return;
@@ -129,7 +147,7 @@ async function initAppointmentCard() {
 
     // Past date warning (non-blocking)
     const today = new Date().toISOString().split("T")[0];
-    if (appointmentDate < today) {
+    if (appointment_date < today) {
       warningEl.textContent = "The selected date is in the past. Are you sure?";
       warningEl.style.display = "block";
     } else {
@@ -137,13 +155,22 @@ async function initAppointmentCard() {
     }
 
     try {
-      await setDoc(doc(db, "appointments", user.uid), {
-        userId: user.uid,
-        appointmentDate,
-        updatedAt: serverTimestamp()
-      });
+      const { error } = await supabase
+        .from("appointments")
+        .upsert(
+          {
+            user_id: userId,
+            appointment_date,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" },
+        );
+
+      if (error) throw error;
       saveBtn.textContent = "✅ Saved";
-      setTimeout(() => { saveBtn.textContent = "Save"; }, 1500);
+      setTimeout(() => {
+        saveBtn.textContent = "Save";
+      }, 1500);
     } catch (e) {
       console.error("Appointment save error:", e);
     }
@@ -151,8 +178,18 @@ async function initAppointmentCard() {
 }
 
 /* ── Main init ────────────────────────────────────────────────────────────── */
-export function initMotherHealthModule() {
+export async function initMotherHealthModule() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) {
+    window.location.href = "../auth/login.html";
+    return;
+  }
+
+  const userId = session.user.id;
+
   initNavCards();
-  initWaterIntakeCard();
-  initAppointmentCard();
+  initWaterIntakeCard(userId);
+  initAppointmentCard(userId);
 }

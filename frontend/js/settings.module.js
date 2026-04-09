@@ -1,48 +1,119 @@
-import { auth, db } from "./firebase.js";
-import {
-  doc,
-  getDoc,
-  setDoc,
-  deleteDoc,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {
-  onAuthStateChanged,
-  updatePassword,
-  reauthenticateWithCredential,
-  EmailAuthProvider,
-  deleteUser,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+// Requirements: 5.8, 10.3, 10.4, 10.6
+import { supabase } from "./supabase.js";
 import { toast } from "./toast.js";
 
 let currentUser = null;
 
-export function initSettingsModule() {
-  onAuthStateChanged(auth, async (user) => {
-    if (!user) return;
-    currentUser = user;
-    await loadUserProfile();
-    setupEventListeners();
-    restorePreferences();
+export async function initSettingsModule() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    window.location.href = "../auth/login.html";
+    return;
+  }
+
+  currentUser = session.user;
+
+  supabase.auth.onAuthStateChange((event, sess) => {
+    if (event === "SIGNED_OUT" || !sess) {
+      window.location.href = "../auth/login.html";
+    }
   });
+
+  await loadUserProfile();
+  setupEventListeners();
+  saveTelegramChatId();
+  restorePreferences();
 }
 
 async function loadUserProfile() {
   if (!currentUser) return;
   try {
-    const snap = await getDoc(doc(db, "users", currentUser.uid));
+    const { data, error } = await supabase
+      .from("users")
+      .select("display_name, telegram_chat_id")
+      .eq("id", currentUser.id)
+      .single();
+
     const nameInput = document.getElementById("settingsDisplayName");
     const emailInput = document.getElementById("settingsEmail");
     const telegramInput = document.getElementById("telegramChatId");
+
     if (emailInput) emailInput.value = currentUser.email || "";
-    if (nameInput) {
-      nameInput.value = snap.exists() ? snap.data().displayName || "" : "";
-    }
-    if (telegramInput && snap.exists()) {
-      telegramInput.value = snap.data().telegramChatId || "";
-    }
+    if (nameInput) nameInput.value = data?.display_name || "";
+    if (telegramInput) telegramInput.value = data?.telegram_chat_id || "";
+
+    if (error) console.error("loadUserProfile error:", error);
   } catch (e) {
     console.error("loadUserProfile error:", e);
   }
+}
+
+export async function loadTelegramChatId() {
+  if (!currentUser) return;
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("telegram_chat_id")
+      .eq("id", currentUser.id)
+      .single();
+
+    const telegramInput = document.getElementById("telegramChatId");
+    if (telegramInput && data) {
+      telegramInput.value = data.telegram_chat_id || "";
+    }
+    if (error) console.error("loadTelegramChatId error:", error);
+  } catch (e) {
+    console.error("loadTelegramChatId error:", e);
+  }
+}
+
+export function saveTelegramChatId() {
+  const saveTelegramBtn = document.getElementById("saveTelegramBtn");
+  if (!saveTelegramBtn) return;
+  saveTelegramBtn.addEventListener("click", async () => {
+    const chatIdInput = document.getElementById("telegramChatId");
+    const errorEl = document.getElementById("telegramChatIdError");
+    const chatId = chatIdInput?.value.trim();
+
+    if (!chatId || !/^-?\d+$/.test(chatId)) {
+      if (errorEl) errorEl.style.display = "block";
+      return;
+    }
+    if (errorEl) errorEl.style.display = "none";
+
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({ telegram_chat_id: chatId })
+        .eq("id", currentUser.id);
+
+      if (error) throw error;
+
+      // Send test notification via backend
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const apiBase = window.__API_BASE_URL__ || "http://localhost:3001";
+        await fetch(`${apiBase}/api/telegram/test`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+        });
+      } catch (_) {
+        /* test notification is optional */
+      }
+
+      showMessage("Telegram Chat ID saqlandi! Test xabar yuborildi.");
+    } catch (e) {
+      showMessage("Telegram Chat ID saqlanmadi", "error");
+    }
+  });
 }
 
 export function validatePasswordMatch(p1, p2) {
@@ -84,7 +155,7 @@ function showMessage(text, type = "success") {
 }
 
 function setupEventListeners() {
-  // Save profile
+  // Save profile (display_name)
   const saveProfileBtn = document.getElementById("saveProfileBtn");
   if (saveProfileBtn) {
     saveProfileBtn.addEventListener("click", async () => {
@@ -94,13 +165,12 @@ function setupEventListeners() {
         return;
       }
       try {
-        await setDoc(
-          doc(db, "users", currentUser.uid),
-          {
-            displayName: name,
-          },
-          { merge: true },
-        );
+        const { error } = await supabase
+          .from("users")
+          .update({ display_name: name })
+          .eq("id", currentUser.id);
+
+        if (error) throw error;
         showMessage("Profile saved successfully!");
       } catch (e) {
         showMessage("Failed to save profile", "error");
@@ -108,16 +178,15 @@ function setupEventListeners() {
     });
   }
 
-  // Change password
+  // Change password — no re-auth needed with Supabase
   const changePasswordBtn = document.getElementById("changePasswordBtn");
   if (changePasswordBtn) {
     changePasswordBtn.addEventListener("click", async () => {
-      const currentPw = document.getElementById("currentPassword")?.value;
       const newPw = document.getElementById("newPassword")?.value;
       const confirmPw = document.getElementById("confirmPassword")?.value;
       const errorEl = document.getElementById("passwordError");
 
-      if (!currentPw || !newPw || !confirmPw) {
+      if (!newPw || !confirmPw) {
         if (errorEl) {
           errorEl.textContent = "Please fill all password fields";
           errorEl.style.display = "block";
@@ -134,16 +203,15 @@ function setupEventListeners() {
       if (errorEl) errorEl.style.display = "none";
 
       try {
-        const credential = EmailAuthProvider.credential(
-          currentUser.email,
-          currentPw,
-        );
-        await reauthenticateWithCredential(currentUser, credential);
-        await updatePassword(currentUser, newPw);
+        const { error } = await supabase.auth.updateUser({ password: newPw });
+        if (error) throw error;
         showMessage("Password changed successfully!");
-        document.getElementById("currentPassword").value = "";
-        document.getElementById("newPassword").value = "";
-        document.getElementById("confirmPassword").value = "";
+        const newPwEl = document.getElementById("newPassword");
+        const confirmPwEl = document.getElementById("confirmPassword");
+        const currentPwEl = document.getElementById("currentPassword");
+        if (newPwEl) newPwEl.value = "";
+        if (confirmPwEl) confirmPwEl.value = "";
+        if (currentPwEl) currentPwEl.value = "";
       } catch (e) {
         if (errorEl) {
           errorEl.textContent = e.message || "Failed to change password";
@@ -176,37 +244,6 @@ function setupEventListeners() {
   const deleteBtn = document.getElementById("deleteAccountBtn");
   if (deleteBtn) {
     deleteBtn.addEventListener("click", showDeleteConfirmDialog);
-  }
-
-  // Telegram Chat ID save
-  const saveTelegramBtn = document.getElementById("saveTelegramBtn");
-  if (saveTelegramBtn) {
-    saveTelegramBtn.addEventListener("click", async () => {
-      const chatIdInput = document.getElementById("telegramChatId");
-      const errorEl = document.getElementById("telegramChatIdError");
-      const chatId = chatIdInput?.value.trim();
-
-      if (!chatId) {
-        if (errorEl) {
-          errorEl.style.display = "block";
-        }
-        return;
-      }
-      if (errorEl) errorEl.style.display = "none";
-
-      try {
-        await setDoc(
-          doc(db, "users", currentUser.uid),
-          {
-            telegramChatId: chatId,
-          },
-          { merge: true },
-        );
-        showMessage("Telegram Chat ID saved!");
-      } catch (e) {
-        showMessage("Failed to save Telegram Chat ID", "error");
-      }
-    });
   }
 }
 
@@ -256,13 +293,31 @@ export function showDeleteConfirmDialog() {
 export async function deleteAccount() {
   if (!currentUser) return;
   try {
-    await deleteDoc(doc(db, "users", currentUser.uid));
-    await deleteUser(currentUser);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const token = session?.access_token;
+    if (!token) throw new Error("No active session");
+
+    const apiBase = window.__API_BASE_URL__ || "";
+    const res = await fetch(`${apiBase}/api/account`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error?.message || "Failed to delete account");
+    }
+
+    await supabase.auth.signOut();
     window.location.href = "../index.html";
   } catch (e) {
     toast(
-      "Failed to delete account: " +
-        (e.message || "Please re-login and try again."),
+      "Failed to delete account: " + (e.message || "Please try again."),
       "error",
     );
   }

@@ -1,21 +1,19 @@
 {
-  "name": "functions",
-  "description": "Cloud Functions for Firebase",
+  "name": "pediamom-backend",
+  "description": "PediaMom Backend — Node.js + Express + Supabase",
   "scripts": {
-    "serve": "firebase emulators:start --only functions",
-    "shell": "firebase functions:shell",
-    "start": "npm run shell",
-    "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log",
-    "init-db": "node scripts/initializeDatabase.js",
+    "start": "node index.js",
+    "dev": "node index.js",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "init-db": "node scripts/initializeDatabase.js"
   },
   "engines": {
-    "node": "20"
+    "node": ">=18"
   },
   "main": "index.js",
   "dependencies": {
+    "@supabase/supabase-js": "^2.101.1",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
@@ -23,6 +21,8 @@
     "firebase-admin": "^13.6.0",
     "firebase-functions": "^7.0.0",
     "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "node-cron": "^4.2.1",
     "stripe": "^20.4.1"
   },
   "devDependencies": {

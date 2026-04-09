@@ -1,15 +1,7 @@
 // dashboard.js
-import { auth, db } from "./firebase.js";
-import {
-  onAuthStateChanged,
-  signOut,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  doc,
-  getDoc,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { supabase } from "./supabase.js";
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const dashboard = document.getElementById("dashboardPage");
   if (!dashboard) return;
 
@@ -26,29 +18,6 @@ document.addEventListener("DOMContentLoaded", () => {
     home: `
       <div class="home-page">
         <h1>Welcome back 👋</h1>
-
-        <div class="home-stats" id="homeStats">
-          <div class="stat-card" data-nav="children">
-            <span class="stat-icon">👶</span>
-            <span class="stat-value" id="statChildren">—</span>
-            <span class="stat-label">Children</span>
-          </div>
-          <div class="stat-card" data-nav="medicines">
-            <span class="stat-icon">💊</span>
-            <span class="stat-value" id="statMedicines">—</span>
-            <span class="stat-label">Active Medicines</span>
-          </div>
-          <div class="stat-card" data-nav="checklist">
-            <span class="stat-icon">✅</span>
-            <span class="stat-value" id="statChecked">—</span>
-            <span class="stat-label">Taken Today</span>
-          </div>
-          <div class="stat-card" data-nav="knowledgebase">
-            <span class="stat-icon">📚</span>
-            <span class="stat-value" id="statArticles">—</span>
-            <span class="stat-label">Articles</span>
-          </div>
-        </div>
 
         <div class="home-quick-actions">
           <h2>Quick Actions</h2>
@@ -67,13 +36,6 @@ document.addEventListener("DOMContentLoaded", () => {
             </button>
           </div>
         </div>
-
-        <div class="home-recent">
-          <h2>My Children</h2>
-          <div class="recent-children-list" id="recentChildren">
-            <p class="home-empty-hint">Loading...</p>
-          </div>
-        </div>
       </div>
     `,
 
@@ -90,10 +52,10 @@ document.addEventListener("DOMContentLoaded", () => {
       <h3 id="childModalTitle">Add Child</h3>
 
       <form id="childForm">
-        <input type="text" id="name" placeholder="Child name" required />
+        <input type="text" id="childName" name="childName" placeholder="Child name" required />
 
         <div class="age-input-group">
-          <input type="number" id="age" placeholder="Age" min="0" required />
+          <input type="number" id="age" name="age" placeholder="Age" min="0" required />
           <div class="age-unit-toggle">
             <button type="button" id="ageUnitYears" class="active">yrs</button>
             <button type="button" id="ageUnitMonths">mo</button>
@@ -101,11 +63,16 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
         <input type="hidden" id="ageUnit" value="years" />
 
-        <select id="gender" required>
+        <select id="gender" name="gender" required>
           <option value="">Select gender</option>
           <option value="male">Male</option>
           <option value="female">Female</option>
         </select>
+
+        <div style="margin-top:12px;">
+          <label style="font-size:13px;color:#64748b;display:block;margin-bottom:4px;">Birth Date (optional)</label>
+          <input type="date" id="birthDate" name="birthDate" />
+        </div>
 
         <div class="pm-modal-actions">
           <button type="submit" class="pm-primary">Save</button>
@@ -125,11 +92,6 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="container">
           <h2>Medicine List</h2>
 
-          <div class="medicine-tabs">
-            <button class="tab-btn active" data-tab="child-medicines">💊 Child Medicines</button>
-            <button class="tab-btn" data-tab="my-supplements">🌿 My Supplements</button>
-          </div>
-
           <div class="tab-content active" data-tab="child-medicines">
             <div class="medicine-child-filter">
               <label for="medicineChildSelect">Select child</label>
@@ -146,17 +108,6 @@ document.addEventListener("DOMContentLoaded", () => {
             </form>
 
             <ul id="medicineList"></ul>
-          </div>
-
-          <div class="tab-content" data-tab="my-supplements">
-            <form id="addSupplementForm">
-              <input type="text" id="supplementName" placeholder="Supplement name" required>
-              <input type="text" id="supplementDosage" placeholder="Dosage" required>
-              <input type="number" id="supplementTimesPerDay" placeholder="Times per day" min="1" required>
-              <button type="submit">Add Supplement</button>
-            </form>
-
-            <ul id="supplementList"></ul>
           </div>
         </div>
       </div>
@@ -180,11 +131,6 @@ document.addEventListener("DOMContentLoaded", () => {
     </p>
 
     <ul id="dailyChecklist"></ul>
-
-    <div class="chart-box">
-      <h3>📊 Weekly Medicine Consistency</h3>
-      <canvas id="weeklyChart"></canvas>
-    </div>
 
     <div id="missedWarning" class="warning hidden">
       ⚠️ Yesterday you missed your medicines
@@ -293,25 +239,40 @@ document.addEventListener("DOMContentLoaded", () => {
         <label>Analysis Type</label>
         <select id="typeSelect">
           <option value="">Select type</option>
-          <option value="blood">Blood</option>
-          <option value="vitamin">Vitamin</option>
+          <option value="blood">🩸 Blood (5 credits)</option>
+          <option value="vitamin">💊 Vitamin (4 credits)</option>
         </select>
 
         <div id="bloodFields" style="display:none;">
           <h4>Blood Analysis</h4>
-          <input type="number" id="hemoglobin" placeholder="Hemoglobin" />
-          <input type="number" id="ferritin" name="ferritin" placeholder="Ferritin" />
+          <input type="number" id="hemoglobin" placeholder="Hemoglobin (g/dL)" step="0.1" />
+          <input type="number" id="ferritin" name="ferritin" placeholder="Ferritin (ng/mL)" step="0.1" />
         </div>
 
         <div id="vitaminFields" style="display:none;">
           <h4>Vitamin Analysis</h4>
-          <input type="number" id="vitaminD" placeholder="Vitamin D" />
-          <input type="number" id="vitaminB12" placeholder="Vitamin B12" />
+          <input type="number" id="vitaminD" placeholder="Vitamin D (ng/mL)" step="0.1" />
+          <input type="number" id="vitaminB12" placeholder="Vitamin B12 (pg/mL)" step="1" />
         </div>
 
         <button type="submit">Save Analysis</button>
       </form>
-      <div id="aiSummaryBlock" style="display:none"></div>
+
+      <!-- AI Analysis Block -->
+      <div id="aiAnalysisSection" style="display:none;margin-top:20px;">
+        <div class="ai-analysis-card">
+          <div class="ai-analysis-header">
+            <span>🤖 AI Analysis</span>
+            <span id="aiCreditCost" class="ai-credit-badge"></span>
+          </div>
+          <p style="font-size:13px;color:#64748b;margin:8px 0 12px;">
+            Get AI-powered interpretation of this analysis result.
+          </p>
+          <button id="runAIAnalysisBtn" class="ai-run-btn">Run AI Analysis</button>
+        </div>
+      </div>
+
+      <div id="aiSummaryBlock" style="display:none;margin-top:16px;"></div>
 
     </div>
   </div>
@@ -366,27 +327,13 @@ document.addEventListener("DOMContentLoaded", () => {
   </div>
 `,
 
-    admin: `
-  <div class="admin-page">
-    <div class="admin-header">
-      <h2>👑 Admin Panel</h2>
-      <button id="adminAddBtn" class="admin-add-btn">➕ Add Article</button>
-    </div>
-    <div class="admin-search-bar">
-      <input id="adminSearch" placeholder="Search articles..." />
-      <select id="adminCategoryFilter">
-        <option value="">All Categories</option>
-        <option value="harmful">Harmful</option>
-        <option value="immunity">Immunity</option>
-        <option value="vaccines">Vaccines</option>
-        <option value="herbal">Herbal</option>
-        <option value="nutrition">Nutrition</option>
-        <option value="sleep">Sleep</option>
-      </select>
-    </div>
-    <div id="adminArticlesList"></div>
-  </div>
-`,
+    admin: `<div class="admin-page"></div>`,
+
+    childhealth: `<div class="child-health-page"></div>`,
+
+    family: `<div class="family-page"></div>`,
+
+    notifications: `<div class="notifications-page"></div>`,
 
     motherhealth: `
 <div class="motherhealth-page">
@@ -396,9 +343,9 @@ document.addEventListener("DOMContentLoaded", () => {
   </div>
   <div class="mh-nav-cards">
     <div class="mh-nav-card" data-page="pregnancy">
-      <span class="mh-icon">🤰</span>
-      <h3>Pregnancy & Period</h3>
-      <p>Track your pregnancy journey and menstrual cycle</p>
+      <span class="mh-icon">🩸</span>
+      <h3>Period Tracker</h3>
+      <p>Track your cycle, predict ovulation and fertile window</p>
     </div>
     <div class="mh-nav-card" data-page="medicines">
       <span class="mh-icon">💊</span>
@@ -435,66 +382,86 @@ document.addEventListener("DOMContentLoaded", () => {
     pregnancy: `
 <div class="pregnancy-page">
   <div class="pregnancy-header">
-    <h2>🤰 Pregnancy &amp; Period Calendar</h2>
-    <p>Track your pregnancy journey and menstrual cycle</p>
+    <h2>🩸 Period Tracker</h2>
+    <p>Track your cycle, predict ovulation and fertile window</p>
   </div>
 
-  <div class="pregnancy-info-cards">
-    <div class="pregnancy-info-card">
-      <h3>📋 Overview</h3>
-      <p>Monitor your pregnancy progress and key milestones week by week.</p>
-    </div>
-    <div class="pregnancy-info-card">
-      <h3>📅 This Week</h3>
-      <p>Your baby is growing. Stay hydrated and take your prenatal vitamins.</p>
-    </div>
-    <div class="pregnancy-info-card">
-      <h3>🏆 Milestones</h3>
-      <p>Track important milestones throughout your pregnancy journey.</p>
-    </div>
-    <div class="pregnancy-info-card">
-      <h3>🩺 Symptoms</h3>
-      <textarea id="symptomsTextarea" placeholder="Note your symptoms here..." rows="3" style="width:100%;margin-top:8px;padding:8px;border-radius:8px;border:1px solid #e2e8f0;font-size:13px;resize:vertical;"></textarea>
-      <button id="updateSymptomsBtn" style="margin-top:8px;">Save</button>
-    </div>
-    <div class="pregnancy-info-card">
-      <h3>🤖 AI Advice</h3>
-      <p style="color:#64748b;font-size:14px;">AI-powered pregnancy advice coming soon. Stay tuned!</p>
-    </div>
-  </div>
+  <!-- Predictions -->
+  <div id="periodPredictions" class="period-predictions"></div>
 
+  <!-- Log Form -->
   <div class="period-calendar-section pregnancy-form-container">
-    <h3>🗓️ Period Calendar</h3>
-
+    <h3>📝 Log Period</h3>
     <div class="period-inputs">
       <div>
-        <label for="lastPeriodDate" style="display:block;font-size:13px;color:#64748b;margin-bottom:4px;">Last Period Date</label>
+        <label style="display:block;font-size:13px;color:#64748b;margin-bottom:4px;">Period Start Date</label>
         <input type="date" id="lastPeriodDate" />
       </div>
       <div>
-        <label for="cycleLength" style="display:block;font-size:13px;color:#64748b;margin-bottom:4px;">Cycle Length (21–35 days)</label>
+        <label style="display:block;font-size:13px;color:#64748b;margin-bottom:4px;">Period End Date</label>
+        <input type="date" id="periodEndDate" />
+      </div>
+      <div>
+        <label style="display:block;font-size:13px;color:#64748b;margin-bottom:4px;">Cycle Length (21–35 days)</label>
         <input type="number" id="cycleLength" min="21" max="35" value="28" />
       </div>
+      <div>
+        <label style="display:block;font-size:13px;color:#64748b;margin-bottom:4px;">Flow Level</label>
+        <select id="flowLevel" style="padding:10px 12px;border-radius:10px;border:1px solid #e2e8f0;font-size:14px;width:100%;">
+          <option value="">Select flow</option>
+          <option value="light">🩸 Light</option>
+          <option value="medium">🩸🩸 Medium</option>
+          <option value="heavy">🩸🩸🩸 Heavy</option>
+        </select>
+      </div>
       <div style="display:flex;align-items:flex-end;">
-        <button id="savePeriodBtn">Save</button>
+        <button id="savePeriodBtn" class="pm-primary" style="width:100%;">Save</button>
       </div>
     </div>
+  </div>
 
+  <!-- Calendar -->
+  <div class="period-calendar-section">
     <div class="calendar-nav">
       <button id="calendarPrev">&#8592; Prev</button>
       <span id="calendarTitle" style="font-weight:600;font-size:16px;color:#1e293b;"></span>
       <button id="calendarNext">Next &#8594;</button>
     </div>
-
     <div id="periodCalendarGrid" class="calendar-grid"></div>
+    <div id="calendarLegend" class="calendar-legend"></div>
+  </div>
 
-    <div id="nextPeriodInfo" class="next-period-info"></div>
+  <!-- Symptoms -->
+  <div class="period-calendar-section pregnancy-form-container">
+    <h3>🩺 Symptoms & Notes</h3>
+    <textarea id="symptomsTextarea" placeholder="Note your symptoms, mood, or anything else..." rows="3" style="width:100%;padding:10px;border-radius:10px;border:1px solid #e2e8f0;font-size:13px;resize:vertical;box-sizing:border-box;"></textarea>
+    <button id="updateSymptomsBtn" style="margin-top:8px;">Save Notes</button>
+  </div>
+
+  <!-- History -->
+  <div class="period-calendar-section">
+    <h3>📊 Cycle History</h3>
+    <div id="cycleHistoryList"></div>
   </div>
 </div>
 `,
 
     billing: `
 <div id="billingPage"></div>
+`,
+
+    vaccination: `
+<div class="vaccination-page">
+  <h2>💉 Vaccination Tracker</h2>
+  <div class="medicine-child-filter">
+    <label>Select child</label>
+    <select id="vaccinationChildSelect">
+      <option value="">— Select child —</option>
+    </select>
+  </div>
+  <p id="vaccinationHint" class="hint">👶 Bolani tanlang</p>
+  <ul id="vaccinationList" style="display:none"></ul>
+</div>
 `,
 
     settings: `
@@ -548,11 +515,17 @@ document.addEventListener("DOMContentLoaded", () => {
   </div>
 
   <div class="settings-section">
-    <h3>📱 Telegram Notifications</h3>
-    <p style="font-size:13px;color:#94a3b8;">
-      🚧 Telegram notifications are coming soon. Stay tuned!
+  <h3>📱 Telegram Notifications</h3>
+  <p style="font-size:13px;color:#64748b;">Telegram botdan chat ID olish: @userinfobot ga /start yuboring</p>
+  <div class="settings-field">
+    <label>Telegram Chat ID</label>
+    <input type="text" id="telegramChatId" placeholder="-100xxxxxxxxx yoki 123456789" />
+    <p id="telegramChatIdError" class="settings-error" style="display:none;">
+      Noto'g'ri format. Faqat raqamlar (ixtiyoriy minus bilan).
     </p>
   </div>
+  <button id="saveTelegramBtn" class="settings-save-btn">Saqlash</button>
+</div>
 
   <div class="settings-section">
     <h3>🎨 App Preferences</h3>
@@ -588,36 +561,72 @@ document.addEventListener("DOMContentLoaded", () => {
   content.innerHTML = pages.home;
   initHomePage();
 
+  // Handle Stripe payment return
+  const urlParams = new URLSearchParams(window.location.search);
+  const paymentStatus = urlParams.get("payment");
+  if (paymentStatus === "success") {
+    // Clean URL
+    window.history.replaceState({}, "", window.location.pathname);
+    // Navigate to billing page to show updated balance
+    setTimeout(() => {
+      const billingItem = dashboard.querySelector(
+        '.menu-item[data-page="billing"]',
+      );
+      if (billingItem) billingItem.click();
+    }, 500);
+  } else if (paymentStatus === "cancelled") {
+    window.history.replaceState({}, "", window.location.pathname);
+    import("./toast.js").then(({ toast }) =>
+      toast("To'lov bekor qilindi", "info"),
+    );
+  }
+
   /* ======================
    AUTH + ROLE CHECK
 ====================== */
 
-  onAuthStateChanged(auth, async (user) => {
-    if (!user) {
+  // Check current session on load
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) {
+    window.location.href = "../auth/login.html";
+    return;
+  }
+
+  await checkAdminRole(session.user.id);
+
+  // Listen for auth state changes
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    if (!session) {
       window.location.href = "../auth/login.html";
       return;
     }
+    await checkAdminRole(session.user.id);
+  });
 
+  async function checkAdminRole(uid) {
     const adminMenu = document.getElementById("adminMenu");
     if (!adminMenu) return;
 
     try {
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
+      console.log("Current UID:", uid);
 
-      console.log("Current UID:", user.uid);
-      console.log("User doc exists:", userSnap.exists());
+      const { data, error } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", uid)
+        .single();
 
-      if (!userSnap.exists()) {
-        console.log("NO USER DOCUMENT IN FIRESTORE");
+      if (error || !data) {
+        console.log("NO USER DOCUMENT IN SUPABASE");
         adminMenu.classList.add("hidden");
         return;
       }
 
-      const role = userSnap.data().role;
-      console.log("Role:", role);
+      console.log("Role:", data.role);
 
-      if (role === "admin") {
+      if (data.role === "admin") {
         adminMenu.classList.remove("hidden");
       } else {
         adminMenu.classList.add("hidden");
@@ -626,7 +635,32 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Role check error:", error);
       adminMenu.classList.add("hidden");
     }
+  }
+  /* ======================
+   MOBILE SIDEBAR TOGGLE
+====================== */
+  const sidebarToggle = document.getElementById("sidebarToggle");
+  const sidebarOverlay = document.getElementById("sidebarOverlay");
+  const sidebar = dashboard.querySelector(".sidebar");
+
+  function openSidebar() {
+    sidebar?.classList.add("open");
+    sidebarOverlay?.classList.add("active");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeSidebar() {
+    sidebar?.classList.remove("open");
+    sidebarOverlay?.classList.remove("active");
+    document.body.style.overflow = "";
+  }
+
+  sidebarToggle?.addEventListener("click", () => {
+    sidebar?.classList.contains("open") ? closeSidebar() : openSidebar();
   });
+
+  sidebarOverlay?.addEventListener("click", closeSidebar);
+
   /* ======================
    MENU NAVIGATION
 ====================== */
@@ -634,6 +668,7 @@ document.addEventListener("DOMContentLoaded", () => {
     item.addEventListener("click", async () => {
       menuItems.forEach((i) => i.classList.remove("active"));
       item.classList.add("active");
+      closeSidebar(); // close sidebar on mobile after nav
 
       const pageKey = item.dataset.page;
       if (!pages[pageKey]) return;
@@ -676,6 +711,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (pageKey === "addanalysis") {
         const module = await import("./addanalysis.module.js");
         module.initAddAnalysisModule();
+
+        if (typeof module.destroyAddAnalysisModule === "function") {
+          window.__destroyCurrentPage = module.destroyAddAnalysisModule;
+        }
       }
 
       if (pageKey === "results") {
@@ -725,12 +764,44 @@ document.addEventListener("DOMContentLoaded", () => {
         const module = await import("./settings.module.js");
         module.initSettingsModule();
       }
+
+      if (pageKey === "vaccination") {
+        const module = await import("./vaccination.module.js");
+        module.initVaccinationModule();
+        if (typeof module.destroyVaccinationModule === "function") {
+          window.__destroyCurrentPage = module.destroyVaccinationModule;
+        }
+      }
+
+      if (pageKey === "childhealth") {
+        const module = await import("./child_health.module.js");
+        module.initChildHealthModule();
+        if (typeof module.destroyChildHealthModule === "function") {
+          window.__destroyCurrentPage = module.destroyChildHealthModule;
+        }
+      }
+
+      if (pageKey === "family") {
+        const module = await import("./family.module.js");
+        module.initFamilyModule();
+        if (typeof module.destroyFamilyModule === "function") {
+          window.__destroyCurrentPage = module.destroyFamilyModule;
+        }
+      }
+
+      if (pageKey === "notifications") {
+        const module = await import("./notifications.module.js");
+        module.initNotificationsModule();
+        if (typeof module.destroyNotificationsModule === "function") {
+          window.__destroyCurrentPage = module.destroyNotificationsModule;
+        }
+      }
     });
   });
   /* ======================
      HOME PAGE — STATS & QUICK NAV
   ====================== */
-  async function initHomePage() {
+  function initHomePage() {
     // Quick action buttons → navigate to page
     document.querySelectorAll("[data-nav]").forEach((el) => {
       el.addEventListener("click", () => {
@@ -741,79 +812,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (menuItem) menuItem.click();
       });
     });
-
-    // Load stats from Firestore
-    try {
-      const { collection, query, where, getDocs } =
-        await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-
-      const user = auth.currentUser;
-      if (!user) return;
-
-      // Children count
-      const childSnap = await getDocs(
-        query(collection(db, "children"), where("parentId", "==", user.uid)),
-      );
-      const childCount = childSnap.size;
-      const statChildren = document.getElementById("statChildren");
-      if (statChildren) statChildren.textContent = childCount;
-
-      // Medicines count
-      const medSnap = await getDocs(
-        query(
-          collection(db, "medicine_list"),
-          where("parentId", "==", user.uid),
-        ),
-      );
-      const statMedicines = document.getElementById("statMedicines");
-      if (statMedicines) statMedicines.textContent = medSnap.size;
-
-      // Today's checklist taken count
-      const today = new Date().toISOString().split("T")[0];
-      const checkSnap = await getDocs(
-        query(
-          collection(db, "checklist_logs"),
-          where("parentId", "==", user.uid),
-          where("date", "==", today),
-          where("taken", "==", true),
-        ),
-      );
-      const statChecked = document.getElementById("statChecked");
-      if (statChecked) statChecked.textContent = checkSnap.size;
-
-      // Articles count
-      const artSnap = await getDocs(collection(db, "knowledge_base"));
-      const statArticles = document.getElementById("statArticles");
-      if (statArticles) statArticles.textContent = artSnap.size;
-
-      // Recent children list
-      const recentEl = document.getElementById("recentChildren");
-      if (recentEl) {
-        if (childCount === 0) {
-          recentEl.innerHTML = `<p class="home-empty-hint">No children added yet. Click "Add Child" to get started.</p>`;
-        } else {
-          recentEl.innerHTML = "";
-          childSnap.forEach((docSnap) => {
-            const c = docSnap.data();
-            const ageLabel =
-              c.ageUnit === "months" ? `${c.age} mo` : `${c.age} yrs`;
-            const initial = (c.name || "?")[0].toUpperCase();
-            const item = document.createElement("div");
-            item.className = "recent-child-item";
-            item.innerHTML = `
-              <div class="recent-child-avatar">${initial}</div>
-              <div>
-                <div class="recent-child-name">${c.name}</div>
-                <div class="recent-child-meta">${ageLabel} · ${c.gender || ""}</div>
-              </div>
-            `;
-            recentEl.appendChild(item);
-          });
-        }
-      }
-    } catch (e) {
-      console.error("Home stats error:", e);
-    }
   }
 
   /* ======================
@@ -828,7 +826,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document
       .getElementById("logoutConfirmYes")
       ?.addEventListener("click", async () => {
-        await signOut(auth);
+        await supabase.auth.signOut();
         window.location.href = "../index.html";
       });
 

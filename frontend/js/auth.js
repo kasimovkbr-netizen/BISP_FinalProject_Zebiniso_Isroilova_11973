@@ -1,20 +1,4 @@
-import { auth } from "./firebase.js";
-import { db } from "./firebase.js";
-
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  onAuthStateChanged,
-  signOut,
-  sendPasswordResetEmail,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-import {
-  setDoc,
-  doc,
-  serverTimestamp,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
+import { supabase } from "./supabase.js";
 import { toast } from "./toast.js";
 
 // 🔥 Flag: registratsiya jarayonida redirect ni to'xtatish uchun
@@ -23,7 +7,8 @@ let isRegistering = false;
 /* =======================
    AUTH GUARD (FINAL)
 ======================= */
-onAuthStateChanged(auth, (user) => {
+supabase.auth.onAuthStateChange((event, session) => {
+  const user = session?.user ?? null;
   const path = window.location.pathname;
 
   const isIndex = path.endsWith("/") || path.endsWith("index.html");
@@ -82,24 +67,12 @@ document.addEventListener("DOMContentLoaded", () => {
         // 🔥 Registratsiya boshlanmoqda
         isRegistering = true;
 
-        const userCredential = await createUserWithEmailAndPassword(
-          auth,
-          email,
-          password,
-        );
+        const { data, error } = await supabase.auth.signUp({ email, password });
 
-        const user = userCredential.user;
+        if (error) throw error;
 
-        console.log("Creating Firestore doc for:", user.uid);
-
-        // 🔥 Firestore ga yozish (bu tugashini kutamiz)
-        await setDoc(doc(db, "users", user.uid), {
-          email: user.email,
-          role: "parent",
-          createdAt: serverTimestamp(),
-        });
-
-        console.log("Firestore document successfully created");
+        console.log("User registered:", data.user?.id);
+        // Users table row is created automatically via database trigger (Requirement 4.2 / 10.1)
 
         // 🔥 Endi redirect qilishimiz mumkin
         isRegistering = false;
@@ -123,7 +96,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const password = loginForm.querySelector("#password").value;
 
       try {
-        await signInWithEmailAndPassword(auth, email, password);
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
         window.location.href = "./dashboard.html";
       } catch (err) {
         toast(friendlyAuthError(err.message), "error");
@@ -151,10 +128,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const email = document.getElementById("resetEmail").value;
       const resetMessage = document.getElementById("resetMessage");
       try {
-        await sendPasswordResetEmail(auth, email);
+        const { error } = await supabase.auth.resetPasswordForEmail(email);
+        if (error) throw error;
         resetMessage.textContent = "✅ Reset email sent! Check your inbox.";
       } catch (err) {
-        resetMessage.textContent = err.message;
+        resetMessage.textContent = friendlyAuthError(err.message);
       }
     });
   }
@@ -165,23 +143,39 @@ document.addEventListener("DOMContentLoaded", () => {
 ======================= */
 function friendlyAuthError(message) {
   if (!message) return "Something went wrong. Please try again.";
+  // Supabase error messages
   if (
+    message.includes("Invalid login credentials") ||
+    message.includes("invalid_credentials") ||
     message.includes("invalid-credential") ||
     message.includes("wrong-password") ||
     message.includes("user-not-found")
   ) {
     return "Incorrect email or password.";
   }
-  if (message.includes("email-already-in-use")) {
+  if (
+    message.includes("User already registered") ||
+    message.includes("email-already-in-use")
+  ) {
     return "This email is already registered.";
   }
-  if (message.includes("weak-password")) {
+  if (
+    message.includes("Password should be at least") ||
+    message.includes("weak-password")
+  ) {
     return "Password must be at least 6 characters.";
   }
-  if (message.includes("invalid-email")) {
+  if (
+    message.includes("Unable to validate email") ||
+    message.includes("invalid-email")
+  ) {
     return "Please enter a valid email address.";
   }
-  if (message.includes("too-many-requests")) {
+  if (
+    message.includes("too many requests") ||
+    message.includes("too-many-requests") ||
+    message.includes("over_email_send_rate_limit")
+  ) {
     return "Too many attempts. Please try again later.";
   }
   return message;

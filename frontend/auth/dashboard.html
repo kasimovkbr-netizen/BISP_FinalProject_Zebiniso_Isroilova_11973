@@ -7,6 +7,11 @@
 </head>
 <body class="dashboard-page">
 
+  <!-- Mobile hamburger -->
+  <button class="sidebar-toggle" id="sidebarToggle" aria-label="Menu">☰</button>
+  <!-- Sidebar overlay -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
   <div class="dashboard-layout" id="dashboardPage">
 
     <!-- SIDEBAR -->
@@ -21,12 +26,16 @@
         <a class="menu-item" data-page="children">👶 Children</a>
         <a class="menu-item" data-page="medicines">💊 Medicines</a>
         <a class="menu-item" data-page="checklist">📋 Checklist</a>
+        <a class="menu-item" data-page="vaccination">💉 Vaccination</a>
+        <a class="menu-item" data-page="childhealth">🏥 Bola Sog'ligi</a>
+        <a class="menu-item" data-page="family">👨‍👩‍👧 Oila</a>
+        <a class="menu-item" data-page="notifications">🔔 Bildirishnomalar</a>
         <a class="menu-item" data-page="knowledgebase">📚 Knowledge Base</a>
         <a class="menu-item" data-page="addanalysis">🧪 Add Analysis</a>
         <a class="menu-item" data-page="results">📈 Results</a>
         <a class="menu-item" data-page="savedarticles">⭐ Saved Articles</a>
         <a class="menu-item" data-page="motherhealth">👩 Mother Health</a>
-        <a class="menu-item" data-page="pregnancy">🤰 Pregnancy</a>
+        <a class="menu-item" data-page="pregnancy">🩸 Period Tracker</a>
         <a class="menu-item hidden" data-page="admin" id="adminMenu">👑 Admin</a>
         <a class="menu-item" data-page="billing">💳 Billing</a>
         <a class="menu-item" data-page="settings">⚙️ Settings</a>
@@ -85,7 +94,15 @@
     </div>
   </div>
 
-  <script type="module" src="../js/firebase.js"></script>
+  <script>
+    window.__SUPABASE_URL__ = 'https://wgexnndxnfjzxlxncezu.supabase.co';
+    window.__SUPABASE_ANON_KEY__ = 'sb_publishable_E1JW4R0JEpe_V5PmCIGDVw_zMiLXtJT';
+    // Production: Railway URL ga o'zgartiring
+    // window.__API_BASE_URL__ = 'https://pediamom-production.up.railway.app';
+    window.__API_BASE_URL__ = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://localhost:3001'
+      : 'https://pediamom-production.up.railway.app';
+  </script>
   <script type="module" src="../js/dashboard.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 

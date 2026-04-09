@@ -5,8 +5,7 @@
  * and security headers for the PediaMom API.
  */
 
-const rateLimit = require('express-rate-limit');
-const helmet = require('helmet');
+const rateLimit = require("express-rate-limit");
 
 // ─── Rate Limiters ────────────────────────────────────────────────────────────
 
@@ -14,75 +13,69 @@ const helmet = require('helmet');
  * General API rate limiter — 100 requests per 15 minutes per IP
  */
 const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-        success: false,
-        error: {
-            code: 'rate_limit_exceeded',
-            message: 'Too many requests. Please try again later.'
-        }
-    }
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: {
+      code: "rate_limit_exceeded",
+      message: "Too many requests. Please try again later.",
+    },
+  },
 });
 
 /**
  * Strict limiter for expensive AI analysis endpoints — 20 per 15 min per user
  */
 const analysisLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 20,
-    keyGenerator: (req) => req.user?.uid || req.ip,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-        success: false,
-        error: {
-            code: 'analysis_rate_limit_exceeded',
-            message: 'Analysis rate limit exceeded. Please wait before submitting more analyses.'
-        }
-    }
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: {
+      code: "analysis_rate_limit_exceeded",
+      message:
+        "Analysis rate limit exceeded. Please wait before submitting more analyses.",
+    },
+  },
 });
 
 /**
  * Auth endpoint limiter — 10 attempts per 15 min per IP (brute-force protection)
  */
 const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 10,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-        success: false,
-        error: {
-            code: 'auth_rate_limit_exceeded',
-            message: 'Too many authentication attempts. Please try again later.'
-        }
-    }
-});
-
-// ─── Security Headers (Helmet) ────────────────────────────────────────────────
-
-const securityHeaders = helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'"],
-            styleSrc: ["'self'"],
-            imgSrc: ["'self'", 'data:'],
-            connectSrc: ["'self'"],
-            frameSrc: ["'none'"],
-            objectSrc: ["'none'"]
-        }
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: {
+      code: "auth_rate_limit_exceeded",
+      message: "Too many authentication attempts. Please try again later.",
     },
-    crossOriginEmbedderPolicy: false, // Firebase Functions compatibility
-    hsts: {
-        maxAge: 31536000,
-        includeSubDomains: true,
-        preload: true
-    }
+  },
 });
+
+// ─── Security Headers ─────────────────────────────────────────────────────────
+// Using manual headers instead of helmet to avoid CORS-blocking policies
+
+const securityHeaders = (req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  if (process.env.NODE_ENV === "production") {
+    res.setHeader(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains",
+    );
+  }
+  next();
+};
 
 // ─── Input Sanitization ───────────────────────────────────────────────────────
 
@@ -91,42 +84,42 @@ const securityHeaders = helmet({
  * Prevents NoSQL injection and XSS via JSON body.
  */
 function sanitizeValue(value) {
-    if (typeof value === 'string') {
-        // Remove null bytes and trim
-        return value.replace(/\0/g, '').trim();
-    }
-    if (Array.isArray(value)) {
-        return value.map(sanitizeValue);
-    }
-    if (value !== null && typeof value === 'object') {
-        return sanitizeObject(value);
-    }
-    return value;
+  if (typeof value === "string") {
+    // Remove null bytes and trim
+    return value.replace(/\0/g, "").trim();
+  }
+  if (Array.isArray(value)) {
+    return value.map(sanitizeValue);
+  }
+  if (value !== null && typeof value === "object") {
+    return sanitizeObject(value);
+  }
+  return value;
 }
 
 function sanitizeObject(obj) {
-    const clean = {};
-    for (const key of Object.keys(obj)) {
-        // Block Firestore/MongoDB operator injection via keys
-        if (key.startsWith('$') || key.includes('.')) {
-            continue;
-        }
-        clean[key] = sanitizeValue(obj[key]);
+  const clean = {};
+  for (const key of Object.keys(obj)) {
+    // Block Firestore/MongoDB operator injection via keys
+    if (key.startsWith("$") || key.includes(".")) {
+      continue;
     }
-    return clean;
+    clean[key] = sanitizeValue(obj[key]);
+  }
+  return clean;
 }
 
 /**
  * Middleware: sanitize req.body, req.query, req.params
  */
 function sanitizeInput(req, res, next) {
-    if (req.body && typeof req.body === 'object') {
-        req.body = sanitizeObject(req.body);
-    }
-    if (req.query && typeof req.query === 'object') {
-        req.query = sanitizeObject(req.query);
-    }
-    next();
+  if (req.body && typeof req.body === "object") {
+    req.body = sanitizeObject(req.body);
+  }
+  if (req.query && typeof req.query === "object") {
+    req.query = sanitizeObject(req.query);
+  }
+  next();
 }
 
 // ─── Authorization Helpers ────────────────────────────────────────────────────
@@ -136,21 +129,21 @@ function sanitizeInput(req, res, next) {
  * Checks req.params.userId or req.body.userId against req.user.uid.
  */
 function authorizeOwner(req, res, next) {
-    const resourceUserId = req.params.userId || req.body.userId;
+  const resourceUserId = req.params.userId || req.body.userId;
 
-    // If no userId in params/body, skip (route doesn't need ownership check)
-    if (!resourceUserId) return next();
+  // If no userId in params/body, skip (route doesn't need ownership check)
+  if (!resourceUserId) return next();
 
-    if (resourceUserId !== req.user.uid) {
-        return res.status(403).json({
-            success: false,
-            error: {
-                code: 'forbidden',
-                message: 'You are not authorized to access this resource'
-            }
-        });
-    }
-    next();
+  if (resourceUserId !== req.user.uid) {
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: "forbidden",
+        message: "You are not authorized to access this resource",
+      },
+    });
+  }
+  next();
 }
 
 /**
@@ -158,39 +151,42 @@ function authorizeOwner(req, res, next) {
  * Requires Firestore db to be passed in.
  */
 function authorizeChildAccess(db) {
-    return async (req, res, next) => {
-        const childId = req.body.childId || req.params.childId;
-        if (!childId) return next();
+  return async (req, res, next) => {
+    const childId = req.body.childId || req.params.childId;
+    if (!childId) return next();
 
-        try {
-            const childDoc = await db.collection('children').doc(childId).get();
+    try {
+      const childDoc = await db.collection("children").doc(childId).get();
 
-            if (!childDoc.exists) {
-                return res.status(404).json({
-                    success: false,
-                    error: { code: 'child_not_found', message: 'Child not found' }
-                });
-            }
+      if (!childDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          error: { code: "child_not_found", message: "Child not found" },
+        });
+      }
 
-            if (childDoc.data().parentId !== req.user.uid) {
-                return res.status(403).json({
-                    success: false,
-                    error: {
-                        code: 'forbidden',
-                        message: 'You are not authorized to access this child\'s data'
-                    }
-                });
-            }
+      if (childDoc.data().parentId !== req.user.uid) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: "forbidden",
+            message: "You are not authorized to access this child's data",
+          },
+        });
+      }
 
-            next();
-        } catch (error) {
-            console.error('Child authorization error:', error);
-            return res.status(500).json({
-                success: false,
-                error: { code: 'authorization_error', message: 'Authorization check failed' }
-            });
-        }
-    };
+      next();
+    } catch (error) {
+      console.error("Child authorization error:", error);
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: "authorization_error",
+          message: "Authorization check failed",
+        },
+      });
+    }
+  };
 }
 
 // ─── Request Size Limiter ─────────────────────────────────────────────────────
@@ -199,19 +195,19 @@ function authorizeChildAccess(db) {
  * Reject requests with body larger than 50kb (prevents payload attacks)
  */
 function limitRequestSize(req, res, next) {
-    const contentLength = parseInt(req.headers['content-length'] || '0', 10);
-    const MAX_BYTES = 50 * 1024; // 50 KB
+  const contentLength = parseInt(req.headers["content-length"] || "0", 10);
+  const MAX_BYTES = 50 * 1024; // 50 KB
 
-    if (contentLength > MAX_BYTES) {
-        return res.status(413).json({
-            success: false,
-            error: {
-                code: 'payload_too_large',
-                message: 'Request body exceeds maximum allowed size'
-            }
-        });
-    }
-    next();
+  if (contentLength > MAX_BYTES) {
+    return res.status(413).json({
+      success: false,
+      error: {
+        code: "payload_too_large",
+        message: "Request body exceeds maximum allowed size",
+      },
+    });
+  }
+  next();
 }
 
 // ─── Security Logger ──────────────────────────────────────────────────────────
@@ -220,24 +216,24 @@ function limitRequestSize(req, res, next) {
  * Log suspicious activity without exposing sensitive data
  */
 function securityLogger(req, res, next) {
-    const userId = req.user?.uid || 'anonymous';
-    const method = req.method;
-    const path = req.path;
-    const ip = req.ip || req.connection?.remoteAddress;
+  const userId = req.user?.uid || "anonymous";
+  const method = req.method;
+  const path = req.path;
+  const ip = req.ip || req.connection?.remoteAddress;
 
-    // Log only method + path + userId (no body, no tokens)
-    console.log(`[API] ${method} ${path} | user=${userId} | ip=${ip}`);
-    next();
+  // Log only method + path + userId (no body, no tokens)
+  console.log(`[API] ${method} ${path} | user=${userId} | ip=${ip}`);
+  next();
 }
 
 module.exports = {
-    apiLimiter,
-    analysisLimiter,
-    authLimiter,
-    securityHeaders,
-    sanitizeInput,
-    authorizeOwner,
-    authorizeChildAccess,
-    limitRequestSize,
-    securityLogger
+  apiLimiter,
+  analysisLimiter,
+  authLimiter,
+  securityHeaders,
+  sanitizeInput,
+  authorizeOwner,
+  authorizeChildAccess,
+  limitRequestSize,
+  securityLogger,
 };

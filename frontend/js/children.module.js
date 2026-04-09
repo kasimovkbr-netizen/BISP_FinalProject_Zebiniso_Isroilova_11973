@@ -1,35 +1,68 @@
-import { auth } from "./firebase.js";
-import {
-  getFirestore,
-  collection,
-  query,
-  where,
-  addDoc,
-  getDocs,
-  deleteDoc,
-  updateDoc,
-  doc,
-  serverTimestamp,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+// Requirements: 5.4, 6.1–6.7
+import { supabase } from "./supabase.js";
 
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-const db = getFirestore();
+import { computeScheduledDate } from "./vaccination_utils.js";
+import { UZ_VACCINE_SCHEDULE } from "./uz_vaccine_schedule.js";
+import { generateVaccinationRecords } from "./vaccination.module.js";
 
 let userId = null;
 let editId = null;
+let channel = null;
 
 // Global confirm modal state
 let pendingDeleteChildId = null;
 
-export function initChildrenModule() {
-  onAuthStateChanged(auth, (user) => {
-    if (!user) return;
-    userId = user.uid;
+export async function initChildrenModule() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-    setupUI();
-    loadChildren();
+  if (!session) {
+    window.location.href = "../auth/login.html";
+    return;
+  }
+
+  userId = session.user.id;
+
+  supabase.auth.onAuthStateChange((event, sess) => {
+    if (event === "SIGNED_OUT" || !sess) {
+      window.location.href = "../auth/login.html";
+    }
   });
+
+  setupUI();
+  await loadChildren();
+  subscribeRealtime();
+}
+
+export function destroyModule() {
+  if (channel) {
+    supabase.removeChannel(channel);
+    channel = null;
+  }
+}
+
+/* ======================
+   REALTIME SUBSCRIPTION
+====================== */
+function subscribeRealtime() {
+  if (!userId) return;
+
+  channel = supabase
+    .channel("children-changes")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "children",
+        filter: `parent_id=eq.${userId}`,
+      },
+      () => {
+        loadChildren();
+      },
+    )
+    .subscribe();
 }
 
 /* ======================
@@ -41,17 +74,22 @@ async function loadChildren() {
 
   list.innerHTML = "";
 
-  const q = query(collection(db, "children"), where("parentId", "==", userId));
-  const snap = await getDocs(q);
+  const { data, error } = await supabase
+    .from("children")
+    .select("*")
+    .eq("parent_id", userId);
 
-  snap.forEach((docSnap) => {
-    const c = docSnap.data();
+  if (error) {
+    console.error("[children] loadChildren error:", error);
+    return;
+  }
 
+  (data || []).forEach((c) => {
     const li = document.createElement("li");
     li.className = "child-card";
 
     const ageLabel =
-      c.ageUnit === "months"
+      c.age_unit === "months"
         ? `${Number(c.age ?? 0)} mo`
         : `${Number(c.age ?? 0)} yrs`;
 
@@ -65,15 +103,14 @@ async function loadChildren() {
       </div>
 
       <div class="child-actions">
-        <button class="editBtn" data-id="${docSnap.id}">Edit</button>
-        <button class="deleteBtn" data-id="${docSnap.id}">Delete</button>
+        <button class="editBtn" data-id="${c.id}">Edit</button>
+        <button class="deleteBtn" data-id="${c.id}">Delete</button>
       </div>
     `;
 
-    // actions
-    li.querySelector(".editBtn").onclick = () => openModal(c, docSnap.id);
+    li.querySelector(".editBtn").onclick = () => openModal(c, c.id);
     li.querySelector(".deleteBtn").onclick = () =>
-      openDeleteConfirm(docSnap.id, c?.name);
+      openDeleteConfirm(c.id, c?.name);
 
     list.appendChild(li);
   });
@@ -115,26 +152,67 @@ function setupUI() {
     childForm.onsubmit = async (e) => {
       e.preventDefault();
 
-      const name = childForm.name.value.trim();
-      const age = Number(childForm.age.value);
-      const gender = childForm.gender.value;
-      const ageUnit = document.getElementById("ageUnit")?.value || "years";
+      const name = document.getElementById("childName")?.value.trim();
+      const age = Number(document.getElementById("age")?.value);
+      const gender = document.getElementById("gender")?.value;
+      const age_unit = document.getElementById("ageUnit")?.value || "years";
+      const birth_date = document.getElementById("birthDate")?.value || null;
 
       if (!name || !age || !gender) return;
 
       const data = {
         name,
         age,
-        ageUnit,
+        age_unit,
         gender,
-        parentId: userId,
-        createdAt: serverTimestamp(),
+        parent_id: userId,
       };
 
+      if (birth_date) data.birth_date = birth_date;
+
       if (editId) {
-        await updateDoc(doc(db, "children", editId), data);
+        // Fetch old birth_date before updating
+        const { data: oldData } = await supabase
+          .from("children")
+          .select("birth_date")
+          .eq("id", editId)
+          .single();
+
+        const oldBirthDate = oldData?.birth_date || null;
+
+        const { error } = await supabase
+          .from("children")
+          .update(data)
+          .eq("id", editId);
+
+        if (error) {
+          console.error("[children] update error:", error);
+          return;
+        }
+
+        // Recalculate pending vaccination records if birth_date changed (Req 5.3)
+        if (birth_date && birth_date !== oldBirthDate) {
+          await recalculatePendingRecords(editId, birth_date);
+        }
       } else {
-        await addDoc(collection(db, "children"), data);
+        const { data: inserted, error } = await supabase
+          .from("children")
+          .insert(data)
+          .select()
+          .single();
+
+        if (error) {
+          console.error("[children] insert error:", error);
+          return;
+        }
+
+        if (birth_date && inserted?.id) {
+          try {
+            await generateVaccinationRecords(inserted.id, userId, birth_date);
+          } catch (err) {
+            console.error("generateVaccinationRecords error:", err);
+          }
+        }
       }
 
       closeModal();
@@ -142,7 +220,6 @@ function setupUI() {
     };
   }
 
-  // ✅ Global confirm modal wiring (once per init)
   wireGlobalConfirmModal();
 }
 
@@ -160,12 +237,18 @@ function openModal(child = null, id = null) {
   const title = document.getElementById("childModalTitle");
   if (title) title.textContent = id ? "Edit Child" : "Add Child";
 
-  form.name.value = child?.name || "";
-  form.age.value = child?.age || "";
-  form.gender.value = child?.gender || "";
+  const nameInput = document.getElementById("childName");
+  const ageInput = document.getElementById("age");
+  const genderInput = document.getElementById("gender");
+  const birthDateInput = document.getElementById("birthDate");
+
+  if (nameInput) nameInput.value = child?.name || "";
+  if (ageInput) ageInput.value = child?.age || "";
+  if (genderInput) genderInput.value = child?.gender || "";
+  if (birthDateInput) birthDateInput.value = child?.birth_date || "";
 
   // Restore age unit toggle
-  const savedUnit = child?.ageUnit || "years";
+  const savedUnit = child?.age_unit || "years";
   const ageUnitInput = document.getElementById("ageUnit");
   const ageUnitYears = document.getElementById("ageUnitYears");
   const ageUnitMonths = document.getElementById("ageUnitMonths");
@@ -189,7 +272,6 @@ function closeModal() {
 
 /* ======================
    DELETE via GLOBAL confirmModal
-   Cloud Function cascade delete medicine_list
 ====================== */
 function openDeleteConfirm(childId, childName = "") {
   pendingDeleteChildId = childId;
@@ -199,7 +281,7 @@ function openDeleteConfirm(childId, childName = "") {
 
   if (confirmText) {
     confirmText.textContent = childName
-      ? `Delete "${childName}"? This will also remove that child’s medicines.`
+      ? `Delete "${childName}"? This will also remove that child's medicines.`
       : "Are you sure you want to delete this child?";
   }
 
@@ -228,12 +310,52 @@ function wireGlobalConfirmModal() {
     const id = pendingDeleteChildId;
     pendingDeleteChildId = null;
 
-    // ✅ only delete child doc; Cloud Function will delete medicines
-    await deleteDoc(doc(db, "children", id));
+    const { error } = await supabase.from("children").delete().eq("id", id);
+
+    if (error) {
+      console.error("[children] delete error:", error);
+    }
 
     confirmModal.classList.add("hidden");
     loadChildren();
   };
+}
+
+/* ======================
+   RECALCULATE PENDING VACCINATION RECORDS
+   Requirements: 5.3
+====================== */
+async function recalculatePendingRecords(childId, newBirthDate) {
+  const { data: records, error } = await supabase
+    .from("vaccination_records")
+    .select("id, vaccine_name")
+    .eq("child_id", childId)
+    .eq("status", "pending");
+
+  if (error) {
+    console.error("[children] recalculatePendingRecords error:", error);
+    return;
+  }
+
+  for (const record of records || []) {
+    const vaccine = UZ_VACCINE_SCHEDULE.find(
+      (v) => v.name === record.vaccine_name,
+    );
+    if (!vaccine) continue;
+
+    const newScheduledDate = computeScheduledDate(
+      newBirthDate,
+      vaccine.offsetDays,
+    );
+
+    await supabase
+      .from("vaccination_records")
+      .update({
+        scheduled_date: newScheduledDate,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", record.id);
+  }
 }
 
 /* ======================

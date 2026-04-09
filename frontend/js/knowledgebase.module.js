@@ -1,18 +1,9 @@
-import { db, auth } from "./firebase.js";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  getDocs,
-  addDoc,
-  deleteDoc,
-  doc,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { supabase } from "./supabase.js";
 
 let currentCategory = "";
 let currentArticles = [];
 let rootClickHandler = null;
+let realtimeChannel = null;
 
 export function initKnowledgeBaseModule() {
   const homeView = document.getElementById("kbHomeView");
@@ -29,6 +20,11 @@ export function destroyKnowledgeBaseModule() {
   const page = document.querySelector(".knowledge-page");
   if (page && rootClickHandler) {
     page.removeEventListener("click", rootClickHandler);
+  }
+
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
   }
 
   rootClickHandler = null;
@@ -88,29 +84,17 @@ async function loadArticlesByCategory(category) {
   title.textContent = getCategoryTitle(category);
 
   try {
-    let snap;
-    try {
-      // Try with status + order filters first (requires Firestore index)
-      const q = query(
-        collection(db, "knowledge_base"),
-        where("category", "==", category),
-        where("status", "==", "published"),
-        orderBy("order", "asc"),
-      );
-      snap = await getDocs(q);
-    } catch {
-      // Fallback: query only by category (no index needed)
-      const q = query(
-        collection(db, "knowledge_base"),
-        where("category", "==", category),
-      );
-      snap = await getDocs(q);
-    }
+    const { data, error } = await supabase
+      .from("knowledge_base")
+      .select("*")
+      .eq("category", category);
 
-    currentArticles = snap.docs.map((docSnap) => ({
-      id: docSnap.id,
-      ...docSnap.data(),
-    }));
+    if (error) throw error;
+
+    currentArticles = data || [];
+
+    // Subscribe to realtime changes for this category
+    subscribeToKnowledgeBase(category);
 
     renderArticlesList();
     showListView();
@@ -118,11 +102,36 @@ async function loadArticlesByCategory(category) {
     console.error("Knowledge Base load error:", error);
     listContainer.innerHTML = `
       <p class="kb-empty">
-        Could not load articles. Check Firestore data or indexes.
+        Could not load articles. Please try again later.
       </p>
     `;
     showListView();
   }
+}
+
+function subscribeToKnowledgeBase(category) {
+  // Remove any existing channel before creating a new one
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
+
+  realtimeChannel = supabase
+    .channel("knowledge_base_changes")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "knowledge_base",
+        filter: `category=eq.${category}`,
+      },
+      () => {
+        // Re-load articles on any change
+        loadArticlesByCategory(category);
+      },
+    )
+    .subscribe();
 }
 
 function renderArticlesList() {
@@ -167,7 +176,7 @@ async function renderArticleDetail(article) {
     warning.classList.add("hidden");
   }
 
-  // Bookmark button qo‘shamiz
+  // Bookmark button qo'shamiz
   let bookmarkBtn = document.getElementById("kbBookmarkBtn");
 
   if (!bookmarkBtn) {
@@ -175,20 +184,19 @@ async function renderArticleDetail(article) {
     bookmarkBtn.id = "kbBookmarkBtn";
     bookmarkBtn.className = "kb-bookmark-btn";
 
-    // title elementdan keyin qo‘shamiz
+    // title elementdan keyin qo'shamiz
     title.insertAdjacentElement("afterend", bookmarkBtn);
   }
 
   // Avval bookmark qilinganmi tekshiramiz
-  const existingBookmark = await isBookmarked(article.id);
+  const existingBookmarkId = await isBookmarked(article.id);
 
-  bookmarkBtn.textContent = existingBookmark
+  bookmarkBtn.textContent = existingBookmarkId
     ? "⭐ Remove Bookmark"
     : "⭐ Save Article";
 
   bookmarkBtn.onclick = async () => {
     const saved = await toggleBookmark(article.id);
-
     bookmarkBtn.textContent = saved ? "⭐ Remove Bookmark" : "⭐ Save Article";
   };
 
@@ -248,35 +256,40 @@ function escapeHtml(str) {
 }
 
 async function isBookmarked(articleId) {
-  const user = auth.currentUser;
-  if (!user) return null;
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return null;
 
-  const q = query(
-    collection(db, "user_bookmarks"),
-    where("userId", "==", user.uid),
-    where("articleId", "==", articleId),
-  );
+  const userId = session.user.id;
 
-  const snap = await getDocs(q);
+  const { data, error } = await supabase
+    .from("saved_articles")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("article_id", articleId)
+    .single();
 
-  return snap.empty ? null : snap.docs[0];
+  if (error || !data) return null;
+  return data.id;
 }
 
 async function toggleBookmark(articleId) {
-  const user = auth.currentUser;
-  if (!user) return false;
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return false;
 
-  const existingDoc = await isBookmarked(articleId);
+  const userId = session.user.id;
+  const bookmarkId = await isBookmarked(articleId);
 
-  if (existingDoc) {
-    await deleteDoc(doc(db, "user_bookmarks", existingDoc.id));
+  if (bookmarkId) {
+    await supabase.from("saved_articles").delete().eq("id", bookmarkId);
     return false;
   } else {
-    await addDoc(collection(db, "user_bookmarks"), {
-      userId: user.uid,
-      articleId: articleId,
-      savedAt: new Date(),
-    });
+    await supabase
+      .from("saved_articles")
+      .insert({ user_id: userId, article_id: articleId });
     return true;
   }
 }

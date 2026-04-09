@@ -1,80 +1,71 @@
-import { db, auth } from "./firebase.js";
-import {
-  collection,
-  doc,
-  addDoc,
-  updateDoc,
-  query,
-  where,
-  onSnapshot,
-  getDocs,
-  serverTimestamp,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+// Requirements: 5.6, 6.4
+import { supabase } from "./supabase.js";
 
 let userId = null;
 let selectedChildId = "";
-let chartInstance = null;
-let unsubscribeChecklist = null;
-let unsubscribeChildren = null;
+let checklistChannel = null;
 
 const today = new Date().toISOString().split("T")[0];
 
 /* ======================
    INIT
 ====================== */
-export function initDailyChecklist() {
-  onAuthStateChanged(auth, (user) => {
-    if (!user) return;
+export async function initDailyChecklist() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-    userId = user.uid;
+  if (!session) {
+    window.location.href = "../auth/login.html";
+    return;
+  }
 
-    loadChildrenDropdown();
-    setupChildFilter();
+  userId = session.user.id;
 
-    toggleStats(false); // child tanlanmaguncha chart + warning yashirin
+  supabase.auth.onAuthStateChange((event, sess) => {
+    if (event === "SIGNED_OUT" || !sess) {
+      window.location.href = "../auth/login.html";
+    }
   });
+
+  await loadChildrenDropdown();
+  setupChildFilter();
+  toggleStats(false);
 }
 
-/* ✅ Dashboard page change bo‘lganda chaqirish uchun */
+/* ======================
+   DESTROY (channel cleanup)
+====================== */
 export function destroyDailyChecklist() {
-  cleanupListeners();
-  if (chartInstance) {
-    chartInstance.destroy();
-    chartInstance = null;
+  if (checklistChannel) {
+    supabase.removeChannel(checklistChannel);
+    checklistChannel = null;
   }
 }
 
 /* ======================
    CHILD DROPDOWN
 ====================== */
-function loadChildrenDropdown() {
+async function loadChildrenDropdown() {
   const select = document.getElementById("checklistChildSelect");
-  if (!select) return;
+  if (!select || !userId) return;
 
-  const q = query(collection(db, "children"), where("parentId", "==", userId));
+  const { data, error } = await supabase
+    .from("children")
+    .select("id, name")
+    .eq("parent_id", userId);
 
-  // ✅ old listener bo‘lsa o‘chirib yuboramiz
-  if (unsubscribeChildren) unsubscribeChildren();
+  if (error) {
+    console.error("[daily_checklist] loadChildren error:", error);
+    return;
+  }
 
-  unsubscribeChildren = onSnapshot(q, (snap) => {
-    // ✅ Agar sahifa DOM’dan ketgan bo‘lsa, listener’ni to‘xtatamiz
-    const stillThere = document.getElementById("checklistChildSelect");
-    if (!stillThere) {
-      if (unsubscribeChildren) unsubscribeChildren();
-      unsubscribeChildren = null;
-      return;
-    }
-
-    select.innerHTML = `<option value="">— Select child —</option>`;
-
-    snap.forEach((d) => {
-      const opt = document.createElement("option");
-      opt.value = d.id;
-      opt.textContent = d.data().name;
-      select.appendChild(opt);
-    });
+  select.innerHTML = `<option value="">— Select child —</option>`;
+  (data || []).forEach((child) => {
+    const opt = document.createElement("option");
+    opt.value = child.id;
+    opt.textContent = child.name;
+    select.appendChild(opt);
   });
 }
 
@@ -85,30 +76,21 @@ function setupChildFilter() {
   select.onchange = () => {
     selectedChildId = select.value;
 
-    cleanupListeners();
+    // Cleanup previous realtime channel
+    if (checklistChannel) {
+      supabase.removeChannel(checklistChannel);
+      checklistChannel = null;
+    }
 
-    // ✅ Bola tanlanmagan holat: checklist yashirin
-    if (select.value === "") {
+    if (!selectedChildId) {
       toggleStats(false);
       return;
     }
 
     toggleStats(true);
     loadChecklistRealtime();
-    drawWeeklyChart();
     checkMissedYesterday();
   };
-}
-
-function cleanupListeners() {
-  if (unsubscribeChecklist) {
-    unsubscribeChecklist();
-    unsubscribeChecklist = null;
-  }
-  if (unsubscribeChildren) {
-    unsubscribeChildren();
-    unsubscribeChildren = null;
-  }
 }
 
 /* ======================
@@ -117,87 +99,111 @@ function cleanupListeners() {
 const TIME_SLOTS = ["Morning", "Afternoon", "Evening", "Night"];
 
 function loadChecklistRealtime() {
-  let ul = document.getElementById("dailyChecklist");
+  // Initial render
+  renderChecklist();
+
+  // Subscribe to medicine_list changes via Supabase Realtime
+  checklistChannel = supabase
+    .channel("checklist-medicine-list-changes")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "medicine_list",
+        filter: `parent_id=eq.${userId}`,
+      },
+      () => {
+        renderChecklist();
+      },
+    )
+    .subscribe();
+}
+
+async function renderChecklist() {
+  const ul = document.getElementById("dailyChecklist");
   if (!ul) return;
 
-  let q = query(
-    collection(db, "medicine_list"),
-    where("parentId", "==", userId),
-  );
+  const { data: medicines, error } = await supabase
+    .from("medicine_list")
+    .select("*")
+    .eq("parent_id", userId)
+    .eq("child_id", selectedChildId);
 
-  if (selectedChildId) {
-    q = query(
-      collection(db, "medicine_list"),
-      where("parentId", "==", userId),
-      where("childId", "==", selectedChildId),
-    );
+  if (error) {
+    console.error("[daily_checklist] fetchMedicines error:", error);
+    return;
   }
 
-  unsubscribeChecklist = onSnapshot(q, async (snap) => {
-    // ✅ Har callbackda qayta tekshiramiz: DOM bormi?
-    ul = document.getElementById("dailyChecklist");
-    if (!ul) {
-      if (unsubscribeChecklist) unsubscribeChecklist();
-      unsubscribeChecklist = null;
-      return;
-    }
+  ul.innerHTML = "";
 
-    ul.innerHTML = "";
+  for (const med of medicines || []) {
+    const timesPerDay = Number(med.times_per_day) || 1;
+    const slots = TIME_SLOTS.slice(0, timesPerDay);
 
-    for (const med of snap.docs) {
-      const data = med.data();
-      const timesPerDay = Number(data.timesPerDay) || 1;
-      const slots = TIME_SLOTS.slice(0, timesPerDay);
+    for (const slot of slots) {
+      const { data: logs, error: logError } = await supabase
+        .from("medicine_logs")
+        .select("id, taken")
+        .eq("parent_id", userId)
+        .eq("medicine_id", med.id)
+        .eq("date", today)
+        .eq("time_slot", slot);
 
-      for (const slot of slots) {
-        // Query log for this specific medicine + date + time_slot
-        const logQ = query(
-          collection(db, "medicine_logs"),
-          where("parentId", "==", userId),
-          where("medicineId", "==", med.id),
-          where("date", "==", today),
-          where("time_slot", "==", slot),
-        );
+      if (logError) {
+        console.error("[daily_checklist] fetchLog error:", logError);
+      }
 
-        const logSnap = await getDocs(logQ);
-        const taken = !logSnap.empty && logSnap.docs[0].data().taken;
+      const existingLog = logs && logs.length > 0 ? logs[0] : null;
+      const taken = existingLog ? existingLog.taken : false;
 
-        const li = document.createElement("li");
-        li.innerHTML = `
-          <label>${data.name} – ${data.dosage} (${slot})</label>
-          <input type="checkbox" ${taken ? "checked" : ""}>
-        `;
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <label>${med.name} – ${med.dosage} (${slot})</label>
+        <input type="checkbox" ${taken ? "checked" : ""}>
+      `;
 
-        li.querySelector("input").onchange = async (e) => {
-          if (logSnap.empty) {
-            await addDoc(collection(db, "medicine_logs"), {
-              parentId: userId,
-              medicineId: med.id,
-              childId: data.childId || "",
+      li.querySelector("input").onchange = async (e) => {
+        if (!existingLog) {
+          const { error: insertError } = await supabase
+            .from("medicine_logs")
+            .insert({
+              parent_id: userId,
+              medicine_id: med.id,
+              child_id: med.child_id || "",
               date: today,
               time_slot: slot,
               taken: e.target.checked,
-              updatedAt: serverTimestamp(),
+              updated_at: new Date().toISOString(),
             });
-          } else {
-            await updateDoc(doc(db, "medicine_logs", logSnap.docs[0].id), {
-              taken: e.target.checked,
-              updatedAt: serverTimestamp(),
-            });
+
+          if (insertError) {
+            console.error("[daily_checklist] insert log error:", insertError);
           }
+        } else {
+          const { error: updateError } = await supabase
+            .from("medicine_logs")
+            .update({
+              taken: e.target.checked,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", existingLog.id);
 
-          drawWeeklyChart();
-          checkMissedYesterday();
-        };
+          if (updateError) {
+            console.error("[daily_checklist] update log error:", updateError);
+          }
+        }
 
-        ul.appendChild(li);
-      }
+        checkMissedYesterday();
+      };
+
+      ul.appendChild(li);
     }
-  });
+  }
 }
 
 /* ======================
-   ⚠️ MISSED YESTERDAY
+   MISSED YESTERDAY
 ====================== */
 async function checkMissedYesterday() {
   const warning = document.getElementById("missedWarning");
@@ -207,115 +213,34 @@ async function checkMissedYesterday() {
   y.setDate(y.getDate() - 1);
   const yDate = y.toISOString().split("T")[0];
 
-  let q = query(
-    collection(db, "medicine_logs"),
-    where("parentId", "==", userId),
-    where("date", "==", yDate),
-  );
+  let query = supabase
+    .from("medicine_logs")
+    .select("taken")
+    .eq("parent_id", userId)
+    .eq("date", yDate);
 
   if (selectedChildId) {
-    q = query(
-      collection(db, "medicine_logs"),
-      where("parentId", "==", userId),
-      where("childId", "==", selectedChildId),
-      where("date", "==", yDate),
-    );
+    query = query.eq("child_id", selectedChildId);
   }
 
-  const snap = await getDocs(q);
+  const { data, error } = await query;
 
-  if (snap.empty) {
+  if (error) {
+    console.error("[daily_checklist] checkMissedYesterday error:", error);
+    return;
+  }
+
+  if (!data || data.length === 0) {
     warning.classList.add("hidden");
     return;
   }
-  if (snap.docs.every((d) => d.data().taken === false)) {
+
+  if (data.every((d) => d.taken === false)) {
     warning.innerHTML = `⚠️ Yesterday you missed your medicines`;
     warning.classList.remove("hidden");
   } else {
     warning.classList.add("hidden");
   }
-}
-
-/* ======================
-   📊 WEEKLY CHART
-====================== */
-async function drawWeeklyChart() {
-  const canvas = document.getElementById("weeklyChart");
-  if (!canvas) return;
-
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  if (chartInstance) chartInstance.destroy();
-
-  const isodays = getLast7DatesISO();
-  const labels = getLast7Days();
-  const values = [];
-
-  let medQ = query(
-    collection(db, "medicine_list"),
-    where("parentId", "==", userId),
-  );
-
-  if (selectedChildId) {
-    medQ = query(
-      collection(db, "medicine_list"),
-      where("parentId", "==", userId),
-      where("childId", "==", selectedChildId),
-    );
-  }
-
-  const medsSnap = await getDocs(medQ);
-  const totalMedicines = medsSnap.docs.reduce(
-    (sum, d) => sum + (Number(d.data().timesPerDay) || 1),
-    0,
-  );
-
-  for (const day of isodays) {
-    if (totalMedicines === 0) {
-      values.push(0);
-      continue;
-    }
-
-    let logQ = query(
-      collection(db, "medicine_logs"),
-      where("parentId", "==", userId),
-      where("date", "==", day),
-    );
-
-    if (selectedChildId) {
-      logQ = query(
-        collection(db, "medicine_logs"),
-        where("parentId", "==", userId),
-        where("childId", "==", selectedChildId),
-        where("date", "==", day),
-      );
-    }
-
-    const snap = await getDocs(logQ);
-    const taken = snap.docs.filter((d) => d.data().taken).length;
-
-    values.push(Math.round((taken / totalMedicines) * 100));
-  }
-
-  chartInstance = new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels: labels,
-      datasets: [{ label: "% Taken", data: values }],
-    },
-    options: {
-      responsive: true,
-      scales: { y: { beginAtZero: true, max: 100 } },
-      plugins: {
-        tooltip: {
-          callbacks: {
-            label: (context) => `${context.parsed.y}% of medicines taken`,
-          },
-        },
-      },
-    },
-  });
 }
 
 /* ======================
@@ -330,33 +255,5 @@ function toggleStats(show) {
   if (checklist) checklist.style.display = show ? "flex" : "none";
   if (chartBox) chartBox.style.display = show ? "block" : "none";
   if (warning) warning.classList.toggle("hidden", !show);
-
   if (hint) hint.style.display = show ? "none" : "block";
-}
-
-/* ======================
-   HELPER
-====================== */
-function getLast7Days() {
-  const days = [];
-  const d = new Date();
-  for (let i = 6; i >= 0; i--) {
-    const day = new Date(d);
-    day.setDate(d.getDate() - i);
-    days.push(
-      day.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    );
-  }
-  return days;
-}
-
-function getLast7DatesISO() {
-  const days = [];
-  const d = new Date();
-  for (let i = 6; i >= 0; i--) {
-    const day = new Date(d);
-    day.setDate(d.getDate() - i);
-    days.push(day.toISOString().split("T")[0]);
-  }
-  return days;
 }

@@ -1,137 +1,127 @@
-// results.module.js (FINAL, SPA-friendly)
-// ✅ Fixes:
-// 1) export initResultsModule() bor (dashboard.js dagi error ketadi)
-// 2) filter change'da qayta-qayta onAuthStateChanged qo'ymaydi (memory leak yo'q)
-// 3) page'dan chiqib ketganda DOM null bo'lsa crash qilmaydi
-// 4) o'chirilgan child natijalari UI'da ham, chart'da ham ko'rinmaydi
-// 5) child tanlanmaguncha trend umuman chiqmaydi (hint chiqadi)
-// 6) type === "" (All Types) holatida blood + vitamin bitta chartda ko'rsatiladi
-
-import { auth, db } from "./firebase.js";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-  deleteDoc,
-  updateDoc
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+// results.module.js
+// Requirements: 5.10, 11.5, 11.7
+import { supabase } from "./supabase.js";
 
 let uid = null;
-let unsubAuth = null;
-
+let realtimeChannel = null;
 let trendChart = null;
-let currentEditDocId = null;
+let currentEditId = null;
 let childrenMap = {};
-
 let listenersAttached = false;
 
 /* ======================
-   PUBLIC API (Dashboard calls this)
+   PUBLIC API
 ====================== */
-export function initResultsModule() {
-  // SPA: page DOM hali render bo'lganini tekshiramiz
+
+export async function initResultsModule() {
   const resultsList = document.getElementById("resultsList");
   const childFilter = document.getElementById("childFilter");
   const typeFilter = document.getElementById("typeFilter");
-  const editForm = document.getElementById("editForm");
-  const closeEdit = document.getElementById("closeEdit");
-  const overlay = document.getElementById("overlay");
 
-  if (!resultsList || !childFilter || !typeFilter || !editForm || !closeEdit || !overlay) {
-    // Results page DOM yo'q bo'lsa init qilmaymiz
-    return;
+  if (!resultsList || !childFilter || !typeFilter) return;
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return;
+
+  uid = session.user.id;
+
+  await loadChildrenIntoFilter(uid);
+
+  if (!listenersAttached) {
+    attachStaticListeners();
+    listenersAttached = true;
   }
 
-  // Auth listener (faqat 1 marta)
-  if (unsubAuth) unsubAuth();
+  await loadResults(uid);
+  await updateTrendChart(uid);
 
-  unsubAuth = onAuthStateChanged(auth, async (user) => {
-    if (!user) return;
-
-    uid = user.uid;
-
-    // Children dropdown load
-    await loadChildrenIntoFilter(uid);
-
-    // UI events (faqat 1 marta attach)
-    if (!listenersAttached) {
-      attachStaticListeners();
-      listenersAttached = true;
-    }
-
-    // First render
-    await loadResults(uid);
-    await updateTrendChart(uid);
-  });
+  // Realtime subscription
+  if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+  realtimeChannel = supabase
+    .channel("results-changes")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "medical_analyses",
+        filter: `parent_id=eq.${uid}`,
+      },
+      async () => {
+        await loadResults(uid);
+        await updateTrendChart(uid);
+      },
+    )
+    .subscribe();
 }
 
-/* ======================
-   OPTIONAL (if you want later)
-====================== */
 export function destroyResultsModule() {
-  // auth unsubscribe
-  if (unsubAuth) {
-    unsubAuth();
-    unsubAuth = null;
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
   }
-
-  // chart cleanup
   if (trendChart) {
     trendChart.destroy();
     trendChart = null;
   }
-
   uid = null;
-  currentEditDocId = null;
+  currentEditId = null;
   childrenMap = {};
   listenersAttached = false;
 }
 
 /* ======================
+   PRETTY PRINTER
+====================== */
+
+export function prettyPrintData(dataObj) {
+  if (!dataObj || typeof dataObj !== "object") return String(dataObj ?? "");
+  return Object.entries(dataObj)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(" | ");
+}
+
+/* ======================
    STATIC LISTENERS
 ====================== */
+
 function attachStaticListeners() {
   const childFilter = document.getElementById("childFilter");
   const typeFilter = document.getElementById("typeFilter");
-
   const editForm = document.getElementById("editForm");
   const closeEdit = document.getElementById("closeEdit");
   const overlay = document.getElementById("overlay");
 
-  // Filters (NO more onAuthStateChanged inside)
-  childFilter.addEventListener("change", async () => {
+  childFilter?.addEventListener("change", async () => {
     if (!uid) return;
     await loadResults(uid);
     await updateTrendChart(uid);
   });
 
-  typeFilter.addEventListener("change", async () => {
+  typeFilter?.addEventListener("change", async () => {
     if (!uid) return;
     await loadResults(uid);
     await updateTrendChart(uid);
   });
 
-  // Edit save
-  editForm.addEventListener("submit", async (e) => {
+  editForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-
-    if (!uid || !currentEditDocId) return;
+    if (!uid || !currentEditId) return;
 
     const formData = new FormData(editForm);
-    const updatedValues = {};
-    formData.forEach((v, k) => (updatedValues[k] = Number(v)));
+    const updatedData = {};
+    formData.forEach((v, k) => (updatedData[k] = Number(v)));
 
     try {
-      await updateDoc(doc(db, "medical_results", currentEditDocId), {
-        values: updatedValues
-      });
-
+      const { error } = await supabase
+        .from("medical_analyses")
+        .update({ data: updatedData })
+        .eq("id", currentEditId);
+      if (error) throw error;
       closeEditModal();
       showMessage("Analysis updated!", "success");
-
       await loadResults(uid);
       await updateTrendChart(uid);
     } catch (err) {
@@ -140,14 +130,14 @@ function attachStaticListeners() {
     }
   });
 
-  // Close modal
-  closeEdit.addEventListener("click", closeEditModal);
-  overlay.addEventListener("click", closeEditModal);
+  closeEdit?.addEventListener("click", closeEditModal);
+  overlay?.addEventListener("click", closeEditModal);
 }
 
 /* ======================
-   HELPERS: MODAL + MESSAGE
+   HELPERS
 ====================== */
+
 function closeEditModal() {
   const editModal = document.getElementById("editModal");
   const overlay = document.getElementById("overlay");
@@ -158,42 +148,33 @@ function closeEditModal() {
 function showMessage(text, type = "success", duration = 3000) {
   const messageBox = document.getElementById("messageBox");
   if (!messageBox) return;
-
   const icon = type === "success" ? "✅" : "❌";
   messageBox.innerHTML = `<span class="icon">${icon}</span> ${text}`;
   messageBox.className = type + " show";
-
-  let hideTimeout = setTimeout(() => {
-    messageBox.classList.remove("show");
-  }, duration);
-
-  messageBox.onmouseover = () => clearTimeout(hideTimeout);
-  messageBox.onmouseleave = () => {
-    hideTimeout = setTimeout(() => {
-      messageBox.classList.remove("show");
-    }, 1500);
-  };
+  setTimeout(() => messageBox.classList.remove("show"), duration);
 }
 
 /* ======================
    LOAD CHILDREN -> FILTER
 ====================== */
+
 async function loadChildrenIntoFilter(parentId) {
   const childFilter = document.getElementById("childFilter");
   if (!childFilter) return;
 
-  const snap = await getDocs(
-    query(collection(db, "children"), where("parentId", "==", parentId))
-  );
+  const { data } = await supabase
+    .from("children")
+    .select("id, name")
+    .eq("parent_id", parentId);
 
   childrenMap = {};
   childFilter.innerHTML = `<option value="">All Children</option>`;
 
-  snap.forEach((d) => {
-    childrenMap[d.id] = d.data().name;
+  (data || []).forEach((child) => {
+    childrenMap[child.id] = child.name;
     const option = document.createElement("option");
-    option.value = d.id;
-    option.textContent = d.data().name;
+    option.value = child.id;
+    option.textContent = child.name;
     childFilter.appendChild(option);
   });
 }
@@ -201,74 +182,84 @@ async function loadChildrenIntoFilter(parentId) {
 /* ======================
    LOAD RESULTS
 ====================== */
+
 async function loadResults(parentId) {
   const resultsList = document.getElementById("resultsList");
   const childFilter = document.getElementById("childFilter");
   const typeFilter = document.getElementById("typeFilter");
 
-  // ✅ SPA guard
   if (!resultsList || !childFilter || !typeFilter) return;
 
   resultsList.innerHTML = "";
 
-  const snapshot = await getDocs(
-    query(collection(db, "medical_results"), where("parentId", "==", parentId))
-  );
+  let query = supabase
+    .from("medical_analyses")
+    .select("*")
+    .eq("parent_id", parentId)
+    .order("created_at", { ascending: false });
 
-  snapshot.forEach((docItem) => {
-    const result = docItem.data();
+  if (childFilter.value) query = query.eq("child_id", childFilter.value);
+  if (typeFilter.value) query = query.eq("type", typeFilter.value);
 
-    // ✅ filterlar
-    if (childFilter.value && result.childId !== childFilter.value) return;
-    if (typeFilter.value && result.type !== typeFilter.value) return;
+  const { data, error } = await query;
+  if (error) {
+    console.error("loadResults error:", error);
+    return;
+  }
 
-    // ✅ bola o'chgan bo'lsa UI'da ko'rsatmaymiz
-    if (!childrenMap[result.childId]) return;
+  (data || []).forEach((result) => {
+    if (!childrenMap[result.child_id]) return;
 
     const li = document.createElement("li");
-
-    const valuesHTML = Object.entries(result.values || {})
-      .map(
-        ([key, value]) => `
-          <span class="value-chip">
-            ${key}: <strong>${value}</strong>
-          </span>
-        `
-      )
+    const valuesHTML = prettyPrintData(result.data)
+      .split(" | ")
+      .map((kv) => `<span class="value-chip">${kv}</span>`)
       .join("");
+
+    const aiHTML = result.ai_result
+      ? `
+      <div class="ai-result-inline">
+        <div class="ai-result-label">🤖 AI Tahlil</div>
+        <p class="ai-result-text">${result.ai_result.interpretation || ""}</p>
+        ${
+          result.ai_result.recommendations?.length
+            ? `
+          <ul class="ai-result-recs">
+            ${result.ai_result.recommendations.map((r) => `<li>${r}</li>`).join("")}
+          </ul>`
+            : ""
+        }
+        <div class="ai-result-date">📅 ${result.ai_analyzed_at ? new Date(result.ai_analyzed_at).toLocaleDateString() : ""}</div>
+      </div>`
+      : "";
 
     li.innerHTML = `
       <div class="info">
         <div class="card-header">
-          <span class="child-name">${childrenMap[result.childId]}</span>
+          <span class="child-name">${childrenMap[result.child_id]}</span>
           <span class="type-badge ${result.type}">${result.type}</span>
         </div>
-
         <div class="values">${valuesHTML}</div>
-
-        <div class="date">
-          📅 ${result.createdAt?.toDate?.().toLocaleString?.() || "N/A"}
-        </div>
+        ${aiHTML}
+        <div class="date">📅 ${result.created_at ? new Date(result.created_at).toLocaleString() : "N/A"}</div>
       </div>
-
       <div class="actions">
-        <button data-id="${docItem.id}" class="editBtn">✏️ Edit</button>
-        <button data-id="${docItem.id}" class="deleteBtn">🗑 Delete</button>
+        <button data-id="${result.id}" class="editBtn">✏️ Edit</button>
+        <button data-id="${result.id}" class="deleteBtn">🗑 Delete</button>
       </div>
     `;
-
     resultsList.appendChild(li);
   });
 
-  // Buttons (after render)
-  bindEditButtons();
+  bindEditButtons(data || []);
   bindDeleteButtons(parentId);
 }
 
 /* ======================
-   EDIT BUTTONS
+   EDIT / DELETE BUTTONS
 ====================== */
-function bindEditButtons() {
+
+function bindEditButtons(results) {
   const editModal = document.getElementById("editModal");
   const overlay = document.getElementById("overlay");
   const editFields = document.getElementById("editFields");
@@ -276,26 +267,19 @@ function bindEditButtons() {
   if (!editModal || !overlay || !editFields) return;
 
   document.querySelectorAll(".editBtn").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
-      const docId = e.currentTarget.dataset.id;
-      currentEditDocId = docId;
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      const result = results.find((r) => r.id === id);
+      if (!result) return;
 
-      const docSnap = await getDocs(
-        query(collection(db, "medical_results"), where("__name__", "==", docId))
-      );
-      if (docSnap.empty) return;
-
-      const docData = docSnap.docs[0].data();
-
+      currentEditId = id;
       editFields.innerHTML = "";
-      for (const key in (docData.values || {})) {
+
+      Object.entries(result.data || {}).forEach(([key, val]) => {
         const div = document.createElement("div");
-        div.innerHTML = `
-          <label>${key}:</label>
-          <input type="number" name="${key}" value="${docData.values[key]}" required>
-        `;
+        div.innerHTML = `<label>${key}:</label><input type="number" name="${key}" value="${val}" required>`;
         editFields.appendChild(div);
-      }
+      });
 
       editModal.style.display = "block";
       overlay.style.display = "block";
@@ -303,18 +287,51 @@ function bindEditButtons() {
   });
 }
 
-/* ======================
-   DELETE BUTTONS
-====================== */
 function bindDeleteButtons(parentId) {
   document.querySelectorAll(".deleteBtn").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
-      const docId = e.currentTarget.dataset.id;
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
 
-      if (!confirm("Are you sure, you want to delete this analysis?")) return;
+      // Use global confirm modal instead of browser confirm()
+      const confirmed = await new Promise((resolve) => {
+        const modal = document.getElementById("confirmModal");
+        const text = document.getElementById("confirmText");
+        const yesBtn = document.getElementById("confirmYes");
+        const noBtn = document.getElementById("confirmNo");
 
+        if (!modal || !yesBtn || !noBtn) {
+          resolve(
+            window.confirm("Are you sure you want to delete this analysis?"),
+          );
+          return;
+        }
+
+        if (text)
+          text.textContent = "Are you sure you want to delete this analysis?";
+        modal.classList.remove("hidden");
+
+        const cleanup = () => {
+          modal.classList.add("hidden");
+          yesBtn.onclick = null;
+          noBtn.onclick = null;
+        };
+        yesBtn.onclick = () => {
+          cleanup();
+          resolve(true);
+        };
+        noBtn.onclick = () => {
+          cleanup();
+          resolve(false);
+        };
+      });
+
+      if (!confirmed) return;
       try {
-        await deleteDoc(doc(db, "medical_results", docId));
+        const { error } = await supabase
+          .from("medical_analyses")
+          .delete()
+          .eq("id", id);
+        if (error) throw error;
         await loadResults(parentId);
         await updateTrendChart(parentId);
         showMessage("Analysis deleted!", "success");
@@ -330,12 +347,11 @@ function bindDeleteButtons(parentId) {
    CHART
 ====================== */
 
-// Colors for known metric keys
 const DATASET_COLORS = {
-  hemoglobin: "rgba(54, 162, 235, 1)",   // blue
-  ferritin:   "rgba(255, 99, 132, 1)",   // pink
-  vitaminD:   "rgba(255, 159, 64, 1)",   // orange
-  vitaminB12: "rgba(153, 102, 255, 1)"   // purple
+  hemoglobin: "rgba(54, 162, 235, 1)",
+  ferritin: "rgba(255, 99, 132, 1)",
+  vitaminD: "rgba(255, 159, 64, 1)",
+  vitaminB12: "rgba(153, 102, 255, 1)",
 };
 
 export function drawTrendChart(results, type) {
@@ -345,10 +361,8 @@ export function drawTrendChart(results, type) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
 
-  // type === "" means All Types; otherwise filter by specific type
-  const filtered = type === ""
-    ? [...results]
-    : results.filter((r) => r.type === type);
+  const filtered =
+    type === "" ? [...results] : results.filter((r) => r.type === type);
 
   if (filtered.length === 0) {
     if (trendChart) {
@@ -358,36 +372,25 @@ export function drawTrendChart(results, type) {
     return null;
   }
 
-  filtered.sort(
-    (a, b) =>
-      (a.createdAt?.toDate?.() || 0) - (b.createdAt?.toDate?.() || 0)
-  );
+  filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
-  // Build unified label list (M/D/YYYY format)
   const labelSet = [];
   filtered.forEach((r) => {
-    const d = r.createdAt?.toDate?.();
-    const label = d
-      ? `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`
-      : "N/A";
+    const d = new Date(r.created_at);
+    const label = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
     if (!labelSet.includes(label)) labelSet.push(label);
   });
 
-  // Collect datasets keyed by metric name, aligned to labelSet
   const datasetMap = {};
   filtered.forEach((r) => {
-    const d = r.createdAt?.toDate?.();
-    const label = d
-      ? `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`
-      : "N/A";
+    const d = new Date(r.created_at);
+    const label = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
     const idx = labelSet.indexOf(label);
-
-    for (const key in (r.values || {})) {
-      if (!datasetMap[key]) {
+    Object.entries(r.data || {}).forEach(([key, val]) => {
+      if (!datasetMap[key])
         datasetMap[key] = new Array(labelSet.length).fill(null);
-      }
-      datasetMap[key][idx] = r.values[key];
-    }
+      datasetMap[key][idx] = val;
+    });
   });
 
   const chartDatasets = Object.keys(datasetMap).map((key) => ({
@@ -397,12 +400,13 @@ export function drawTrendChart(results, type) {
     tension: 0.3,
     borderColor: DATASET_COLORS[key] || "rgba(100, 100, 100, 1)",
     backgroundColor: DATASET_COLORS[key] || "rgba(100, 100, 100, 0.2)",
-    spanGaps: true
+    spanGaps: true,
   }));
 
-  const chartTitle = type === ""
-    ? "All Types Trend"
-    : `${type.charAt(0).toUpperCase() + type.slice(1)} Trend`;
+  const chartTitle =
+    type === ""
+      ? "All Types Trend"
+      : `${type.charAt(0).toUpperCase() + type.slice(1)} Trend`;
 
   if (trendChart) trendChart.destroy();
 
@@ -412,31 +416,23 @@ export function drawTrendChart(results, type) {
     options: {
       responsive: true,
       plugins: {
-        title: {
-          display: true,
-          text: chartTitle
-        },
-        legend: { display: true, position: "bottom" }
+        title: { display: true, text: chartTitle },
+        legend: { display: true, position: "bottom" },
       },
-      scales: { y: { beginAtZero: true } }
-    }
+      scales: { y: { beginAtZero: true } },
+    },
   });
 
   return trendChart;
 }
 
-/* ======================
-   UPDATE TREND CHART
-====================== */
 async function updateTrendChart(parentId) {
   const childFilter = document.getElementById("childFilter");
   const typeFilter = document.getElementById("typeFilter");
   const trendHint = document.getElementById("trendHint");
 
-  // ✅ SPA guard
   if (!childFilter || !typeFilter) return;
 
-  // ✅ Child tanlanmagan bo'lsa — trend umuman chiqmasin
   if (!childFilter.value) {
     if (trendChart) {
       trendChart.destroy();
@@ -444,29 +440,15 @@ async function updateTrendChart(parentId) {
     }
     if (trendHint) trendHint.style.display = "block";
     return;
-  } else {
-    if (trendHint) trendHint.style.display = "none";
   }
+  if (trendHint) trendHint.style.display = "none";
 
-  const snapshot = await getDocs(
-    query(collection(db, "medical_results"), where("parentId", "==", parentId))
-  );
+  const { data } = await supabase
+    .from("medical_analyses")
+    .select("*")
+    .eq("parent_id", parentId)
+    .eq("child_id", childFilter.value);
 
-  const allResults = [];
-
-  snapshot.forEach((d) => {
-    const data = d.data();
-
-    // ✅ bola o'chirilgan bo'lsa — chartga ham qo'shmaymiz
-    if (!childrenMap[data.childId]) return;
-
-    // ✅ tanlangan child bo'yicha
-    if (childFilter.value && data.childId !== childFilter.value) return;
-
-    allResults.push(data);
-  });
-
-  // Default to "" (All Types) instead of "blood"
-  const selectedType = typeFilter.value;
-  drawTrendChart(allResults, selectedType);
+  const allResults = (data || []).filter((r) => childrenMap[r.child_id]);
+  drawTrendChart(allResults, typeFilter.value);
 }

@@ -1,25 +1,74 @@
-/**
- * PediaMom — Billing & Subscription Module
- * Handles credits, subscriptions, and freemium status display
- */
-
-import { auth } from "./firebase.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+// billing.module.js — Stripe Checkout Integration
+import { supabase } from "./supabase.js";
 import { toast } from "./toast.js";
 
-const API_BASE = "http://localhost:5001/api";
+const API_BASE = (window.__API_BASE_URL__ || "http://localhost:3001") + "/api";
 
-let _token = null;
+const PACKAGES = [
+  {
+    id: "pack_100",
+    name: "Starter",
+    credits: 100,
+    price: "$3.99",
+    color: "#3b82f6",
+    emoji: "⚡",
+  },
+  {
+    id: "pack_300",
+    name: "Value",
+    credits: 300,
+    price: "$8.99",
+    color: "#8b5cf6",
+    emoji: "🚀",
+    popular: true,
+  },
+  {
+    id: "pack_800",
+    name: "Pro",
+    credits: 800,
+    price: "$19.99",
+    color: "#059669",
+    emoji: "💎",
+  },
+];
 
-async function getToken() {
-  const user = auth.currentUser;
-  if (!user) return null;
-  _token = await user.getIdToken();
-  return _token;
+const TIERS = [
+  {
+    id: "monthly_500",
+    name: "Monthly Plan",
+    price: "$14.99/mo",
+    credits: 500,
+    features: [
+      "500 kredit/oy",
+      "Har oy yangilanadi",
+      "Barcha tahlil turlari",
+      "Telegram eslatmalar",
+    ],
+    color: "#7c3aed",
+    popular: true,
+  },
+];
+
+let currentUser = null;
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
+export async function initBillingModule() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return;
+  currentUser = session.user;
+  await renderBilling();
 }
 
+// ─── API Helper ───────────────────────────────────────────────────────────────
+
 async function apiFetch(path, options = {}) {
-  const token = await getToken();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token;
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
@@ -31,449 +80,306 @@ async function apiFetch(path, options = {}) {
   return res.json();
 }
 
-// ─── Init ─────────────────────────────────────────────────────────────────────
+// ─── Load user data ───────────────────────────────────────────────────────────
 
-export function initBillingModule() {
-  onAuthStateChanged(auth, async (user) => {
-    if (!user) return;
-    await loadStatus();
-  });
-}
-
-// ─── Load Status ──────────────────────────────────────────────────────────────
-
-async function loadStatus() {
-  const container = document.getElementById("billingPage");
-  if (!container) return;
-
-  container.innerHTML = `<div class="billing-loading">Loading...</div>`;
-
-  try {
-    const [statusRes, packagesRes, tiersRes] = await Promise.all([
-      apiFetch("/monetization/status"),
-      apiFetch("/monetization/credits/packages"),
-      apiFetch("/monetization/subscriptions/tiers"),
-    ]);
-
-    if (!statusRes.success) throw new Error("Failed to load status");
-
-    renderBilling(
-      container,
-      statusRes.data,
-      packagesRes.data || [],
-      tiersRes.data || [],
-    );
-  } catch (err) {
-    console.error("Billing load error:", err);
-    container.innerHTML = renderOfflineMode();
-    attachOfflineListeners(container);
-  }
-}
-
-// ─── Offline / Demo Mode ──────────────────────────────────────────────────────
-
-function renderOfflineMode() {
-  const packages = [
-    {
-      id: "basic_50",
-      name: "Basic",
-      credits: 50,
-      bonusCredits: 0,
-      price: 500,
-      priceFormatted: "$5.00",
-      popular: false,
-    },
-    {
-      id: "standard_100",
-      name: "Standard",
-      credits: 100,
-      bonusCredits: 10,
-      price: 900,
-      priceFormatted: "$9.00",
-      popular: true,
-    },
-    {
-      id: "premium_250",
-      name: "Premium",
-      credits: 250,
-      bonusCredits: 50,
-      price: 2000,
-      priceFormatted: "$20.00",
-      popular: false,
-    },
-    {
-      id: "enterprise_500",
-      name: "Enterprise",
-      credits: 500,
-      bonusCredits: 150,
-      price: 3500,
-      priceFormatted: "$35.00",
-      popular: false,
-    },
-  ];
-  const tiers = [
-    {
-      id: "basic",
-      name: "Basic Plan",
-      monthlyPrice: 999,
-      priceFormatted: "$9.99/mo",
-      analysisLimit: 20,
-      analysisLimitLabel: "20/mo",
-      features: [
-        "20 AI analyses/month",
-        "Basic health insights",
-        "Email support",
-      ],
-      popular: false,
-    },
-    {
-      id: "professional",
-      name: "Professional",
-      monthlyPrice: 1999,
-      priceFormatted: "$19.99/mo",
-      analysisLimit: 50,
-      analysisLimitLabel: "50/mo",
-      features: [
-        "50 AI analyses/month",
-        "Advanced insights",
-        "Priority support",
-        "Export reports",
-      ],
-      popular: true,
-    },
-    {
-      id: "enterprise",
-      name: "Enterprise",
-      monthlyPrice: 4999,
-      priceFormatted: "$49.99/mo",
-      analysisLimit: -1,
-      analysisLimitLabel: "Unlimited",
-      features: [
-        "Unlimited analyses",
-        "Premium insights",
-        "Dedicated support",
-        "Custom reports",
-        "API access",
-      ],
-      popular: false,
-    },
-  ];
-  const status = {
-    freeTier: { used: 0, limit: 5, remaining: 5 },
-    credits: 0,
-    subscription: null,
-    plan: "free",
-  };
-  return buildBillingHTML(status, packages, tiers);
-}
-
-function attachOfflineListeners(container) {
-  attachListeners(container, null);
+async function getUserData() {
+  if (!currentUser) return null;
+  const { data } = await supabase
+    .from("users")
+    .select("credits, free_credits_used, subscription_status")
+    .eq("id", currentUser.id)
+    .single();
+  return data;
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 
-function renderBilling(container, status, packages, tiers) {
-  container.innerHTML = buildBillingHTML(status, packages, tiers);
-  attachListeners(container, status);
+async function renderBilling() {
+  const container = document.getElementById("billingPage");
+  if (!container) return;
+
+  container.innerHTML = `<div style="text-align:center;padding:40px;color:#94a3b8;">
+    <div style="font-size:32px;margin-bottom:12px;">⏳</div>
+    <div>Yuklanmoqda...</div>
+  </div>`;
+
+  const userData = await getUserData();
+  const credits = userData?.credits || 0;
+  const freeUsed = userData?.free_credits_used || 0;
+  const freeLimit = 10;
+  const freeRemaining = Math.max(0, freeLimit - freeUsed);
+  const freePercent = Math.min(100, Math.round((freeUsed / freeLimit) * 100));
+
+  container.innerHTML = buildHTML(
+    credits,
+    freeRemaining,
+    freePercent,
+    freeUsed,
+    freeLimit,
+  );
+  attachEvents(container);
 }
 
-function buildBillingHTML(status, packages, tiers) {
-  const { freeTier, credits, subscription, plan } = status;
-  const freePercent = Math.round((freeTier.used / freeTier.limit) * 100);
-
+function buildHTML(credits, freeRemaining, freePercent, freeUsed, freeLimit) {
   return `
-<div class="billing-page">
+<div class="bl-page">
 
-  <!-- Current Plan Banner -->
-  <div class="billing-plan-banner billing-plan-${plan}">
-    <div class="billing-plan-info">
-      <span class="billing-plan-badge">${planLabel(plan, subscription)}</span>
-      <h2>Your Plan</h2>
-      <p>${planDescription(plan, freeTier, credits, subscription)}</p>
+  <!-- Header Stats -->
+  <div class="bl-header">
+    <div class="bl-header-left">
+      <div class="bl-header-title">💳 To'lov va Kreditlar</div>
+      <div class="bl-header-sub">AI tahlil uchun kreditlar sotib oling</div>
     </div>
-    <div class="billing-plan-stats">
-      ${
-        plan === "free"
-          ? `
-        <div class="billing-stat">
-          <span class="billing-stat-value">${freeTier.remaining}</span>
-          <span class="billing-stat-label">Free analyses left</span>
-        </div>
-        <div class="billing-progress-wrap">
-          <div class="billing-progress-bar">
-            <div class="billing-progress-fill ${freePercent >= 80 ? "billing-progress-warn" : ""}"
-                 style="width:${freePercent}%"></div>
-          </div>
-          <span class="billing-progress-text">${freeTier.used}/${freeTier.limit} used this month</span>
-        </div>
-      `
-          : plan === "credits"
-            ? `
-        <div class="billing-stat">
-          <span class="billing-stat-value">${credits}</span>
-          <span class="billing-stat-label">Credits remaining</span>
-        </div>
-      `
-            : `
-        <div class="billing-stat">
-          <span class="billing-stat-value">${subscription?.analysisLimit === -1 ? "∞" : subscription?.analysisLimit}</span>
-          <span class="billing-stat-label">Analyses/month</span>
-        </div>
-      `
-      }
+    <div class="bl-balance-card">
+      <div class="bl-balance-icon">🪙</div>
+      <div>
+        <div class="bl-balance-num">${credits}</div>
+        <div class="bl-balance-label">Mavjud kredit</div>
+      </div>
     </div>
+  </div>
+
+  <!-- Free tier progress -->
+  <div class="bl-free-card">
+    <div class="bl-free-top">
+      <span class="bl-free-title">🎁 Bepul kredit</span>
+      <span class="bl-free-count">${freeRemaining}/${freeLimit} qoldi</span>
+    </div>
+    <div class="bl-progress-bar">
+      <div class="bl-progress-fill ${freePercent >= 80 ? "bl-progress-warn" : ""}" style="width:${freePercent}%"></div>
+    </div>
+    <div class="bl-free-note">Har oy ${freeLimit} ta bepul kredit beriladi</div>
   </div>
 
   <!-- Tabs -->
-  <div class="billing-tabs">
-    <button class="billing-tab active" data-tab="credits">💳 Buy Credits</button>
-    <button class="billing-tab" data-tab="subscription">📅 Subscription</button>
+  <div class="bl-tabs">
+    <button class="bl-tab active" data-tab="credits">⚡ Kredit sotib olish</button>
+    <button class="bl-tab" data-tab="subscription">📅 Obuna</button>
   </div>
 
   <!-- Credits Tab -->
-  <div class="billing-tab-content active" data-tab="credits">
-    <p class="billing-section-desc">Buy credits once, use anytime. No expiry.</p>
-    <div class="billing-packages-grid">
-      ${packages
-        .map(
-          (pkg) => `
-        <div class="billing-package-card ${pkg.popular ? "billing-package-popular" : ""}">
-          ${pkg.popular ? '<span class="billing-popular-badge">Most Popular</span>' : ""}
-          <h3>${pkg.name}</h3>
-          <div class="billing-package-credits">
-            <span class="billing-credits-num">${pkg.credits + (pkg.bonusCredits || 0)}</span>
-            <span class="billing-credits-label">credits</span>
-          </div>
-          ${pkg.bonusCredits > 0 ? `<p class="billing-bonus">+${pkg.bonusCredits} bonus credits</p>` : ""}
-          <div class="billing-package-price">${pkg.priceFormatted || "$" + (pkg.price / 100).toFixed(2)}</div>
-          <p class="billing-per-credit">$${(pkg.price / 100 / (pkg.credits + (pkg.bonusCredits || 0))).toFixed(3)} per credit</p>
-          <button class="billing-buy-btn" data-package="${pkg.id}" data-name="${pkg.name}" data-credits="${pkg.credits + (pkg.bonusCredits || 0)}" data-price="${pkg.priceFormatted || "$" + (pkg.price / 100).toFixed(2)}">
-            Buy Now
+  <div class="bl-tab-content active" data-tab="credits">
+    <p class="bl-desc">Bir martalik to'lov — muddatsiz kredit</p>
+    <div class="bl-packages">
+      ${PACKAGES.map(
+        (pkg) => `
+        <div class="bl-pkg ${pkg.popular ? "bl-pkg-popular" : ""}" style="--pkg-color:${pkg.color}">
+          ${pkg.popular ? '<div class="bl-pkg-badge">🔥 Eng mashhur</div>' : ""}
+          <div class="bl-pkg-emoji">${pkg.emoji}</div>
+          <div class="bl-pkg-name">${pkg.name}</div>
+          <div class="bl-pkg-credits">${pkg.credits}<span>kredit</span></div>
+          <div class="bl-pkg-price">${pkg.price}</div>
+          <div class="bl-pkg-per">${((parseFloat(pkg.price.replace("$", "")) / pkg.credits) * 100).toFixed(1)}¢ / kredit</div>
+          <button class="bl-buy-btn" data-pkg="${pkg.id}" data-credits="${pkg.credits}" data-name="${pkg.name}" data-price="${pkg.price}">
+            Sotib olish
           </button>
         </div>
       `,
-        )
-        .join("")}
+      ).join("")}
     </div>
-    <p class="billing-note">💡 Blood analysis = 5 credits · Vitamin analysis = 4 credits</p>
+    <div class="bl-info-row">
+      <span>🩸 Qon tahlili = 5 kredit</span>
+      <span>💊 Vitamin tahlili = 4 kredit</span>
+    </div>
   </div>
 
   <!-- Subscription Tab -->
-  <div class="billing-tab-content" data-tab="subscription">
-    <p class="billing-section-desc">Monthly plan with fixed number of analyses.</p>
-    ${
-      subscription
-        ? `
-      <div class="billing-active-sub">
-        <span class="billing-active-badge">✅ Active</span>
-        <strong>${subscription.tierName}</strong>
-        <span>${subscription.analysisLimit === -1 ? "Unlimited" : subscription.analysisLimit} analyses/month</span>
-        <button class="billing-cancel-btn" id="cancelSubBtn">Cancel Subscription</button>
-      </div>
-    `
-        : ""
-    }
-    <div class="billing-tiers-grid">
-      ${tiers
-        .map(
-          (tier) => `
-        <div class="billing-tier-card ${tier.popular ? "billing-tier-popular" : ""} ${subscription?.tierId === tier.id ? "billing-tier-active" : ""}">
-          ${tier.popular ? '<span class="billing-popular-badge">Recommended</span>' : ""}
-          <h3>${tier.name}</h3>
-          <div class="billing-tier-price">${tier.priceFormatted || "$" + (tier.monthlyPrice / 100).toFixed(2) + "/mo"}</div>
-          <div class="billing-tier-limit">${tier.analysisLimitLabel || (tier.analysisLimit === -1 ? "Unlimited" : tier.analysisLimit + "/mo")} analyses</div>
-          <ul class="billing-features">
+  <div class="bl-tab-content" data-tab="subscription">
+    <p class="bl-desc">Oylik obuna — har oy kredit yangilanadi</p>
+    <div class="bl-tiers">
+      ${TIERS.map(
+        (tier) => `
+        <div class="bl-tier" style="--tier-color:${tier.color}">
+          ${tier.popular ? '<div class="bl-tier-badge">⭐ Tavsiya etiladi</div>' : ""}
+          <div class="bl-tier-name">${tier.name}</div>
+          <div class="bl-tier-price">${tier.price}</div>
+          <div class="bl-tier-credits">${tier.credits} kredit/oy</div>
+          <ul class="bl-tier-features">
             ${tier.features.map((f) => `<li>✓ ${f}</li>`).join("")}
           </ul>
-          <button class="billing-subscribe-btn ${subscription?.tierId === tier.id ? "billing-current-btn" : ""}"
-                  data-tier="${tier.id}" data-name="${tier.name}"
-                  data-price="${tier.priceFormatted || "$" + (tier.monthlyPrice / 100).toFixed(2) + "/mo"}"
-                  ${subscription?.tierId === tier.id ? "disabled" : ""}>
-            ${subscription?.tierId === tier.id ? "Current Plan" : "Subscribe"}
+          <button class="bl-sub-btn" data-tier="${tier.id}" data-credits="${tier.credits}" data-name="${tier.name}">
+            Obuna bo'lish
           </button>
         </div>
       `,
-        )
-        .join("")}
+      ).join("")}
     </div>
   </div>
 
 </div>`;
 }
 
-function planLabel(plan, subscription) {
-  if (plan === "subscription") return subscription?.tierName || "Subscription";
-  if (plan === "credits") return "Credits";
-  return "Free Plan";
-}
+// ─── Events ───────────────────────────────────────────────────────────────────
 
-function planDescription(plan, freeTier, credits, subscription) {
-  if (plan === "subscription")
-    return `Active subscription — ${subscription?.analysisLimit === -1 ? "unlimited" : subscription?.analysisLimit} analyses per month`;
-  if (plan === "credits") return `You have ${credits} credits available`;
-  return `${freeTier.remaining} of ${freeTier.limit} free analyses remaining this month`;
-}
-
-// ─── Event Listeners ──────────────────────────────────────────────────────────
-
-function attachListeners(container, status) {
+function attachEvents(container) {
   // Tabs
-  container.querySelectorAll(".billing-tab").forEach((btn) => {
+  container.querySelectorAll(".bl-tab").forEach((btn) => {
     btn.addEventListener("click", () => {
       container
-        .querySelectorAll(".billing-tab")
+        .querySelectorAll(".bl-tab")
         .forEach((b) => b.classList.remove("active"));
       container
-        .querySelectorAll(".billing-tab-content")
+        .querySelectorAll(".bl-tab-content")
         .forEach((c) => c.classList.remove("active"));
       btn.classList.add("active");
       container
-        .querySelector(`.billing-tab-content[data-tab="${btn.dataset.tab}"]`)
+        .querySelector(`.bl-tab-content[data-tab="${btn.dataset.tab}"]`)
         ?.classList.add("active");
     });
   });
 
-  // Buy credits
-  container.querySelectorAll(".billing-buy-btn").forEach((btn) => {
-    btn.addEventListener("click", () => showPurchaseConfirm(btn.dataset));
+  // Buy buttons
+  container.querySelectorAll(".bl-buy-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      showConfirmModal({
+        title: "Kredit sotib olish",
+        emoji: "🪙",
+        rows: [
+          ["Paket", btn.dataset.name],
+          ["Kredit", btn.dataset.credits],
+          ["Narx", btn.dataset.price],
+        ],
+        note: "Stripe to'lov sahifasiga yo'naltirilasiz",
+        confirmText: "💳 Stripe bilan to'lash",
+        onConfirm: async () => {
+          await handleBuyStripe(
+            btn.dataset.pkg,
+            btn.dataset.name,
+            btn.dataset.credits,
+          );
+        },
+      });
+    });
   });
 
-  // Subscribe
-  container
-    .querySelectorAll(".billing-subscribe-btn:not([disabled])")
-    .forEach((btn) => {
-      btn.addEventListener("click", () => showSubscribeConfirm(btn.dataset));
+  // Subscribe buttons
+  container.querySelectorAll(".bl-sub-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      showConfirmModal({
+        title: "Obuna bo'lish",
+        emoji: "📅",
+        rows: [
+          ["Reja", btn.dataset.name],
+          ["Kredit", `${btn.dataset.credits}/oy`],
+        ],
+        note: "Stripe to'lov sahifasiga yo'naltirilasiz",
+        confirmText: "💳 Obuna bo'lish",
+        onConfirm: async () => {
+          await handleSubscribeStripe(btn.dataset.tier, btn.dataset.name);
+        },
+      });
+    });
+  });
+}
+
+// ─── Stripe Checkout Handlers ────────────────────────────────────────────────
+
+async function handleBuyStripe(packageId, name, credits) {
+  try {
+    const res = await apiFetch("/monetization/credits/checkout", {
+      method: "POST",
+      body: JSON.stringify({ packageId }),
     });
 
-  // Cancel subscription
-  container
-    .querySelector("#cancelSubBtn")
-    ?.addEventListener("click", cancelSubscription);
+    console.log("[billing] checkout response:", res);
+
+    if (res.success && res.data?.checkoutUrl) {
+      window.location.href = res.data.checkoutUrl;
+    } else if (res.success && res.demo) {
+      toast(`✅ Demo: ${credits} kredit qo'shildi!`, "success");
+      setTimeout(() => renderBilling(), 1000);
+    } else {
+      const errMsg = res.error?.message || res.error || "Xatolik yuz berdi";
+      toast("❌ " + errMsg, "error");
+    }
+  } catch (e) {
+    console.error("[billing] fetch error:", e);
+    toast(
+      "❌ Server bilan bog'lanib bo'lmadi. Serverni ishga tushiring.",
+      "error",
+    );
+  }
 }
 
-// ─── Purchase Confirm Modal ───────────────────────────────────────────────────
+async function handleSubscribeStripe(tierId, name) {
+  try {
+    const res = await apiFetch("/monetization/subscriptions/checkout", {
+      method: "POST",
+      body: JSON.stringify({ tierId }),
+    });
 
-function showPurchaseConfirm({ package: pkgId, name, credits, price }) {
-  showBillingModal({
-    title: "💳 Confirm Purchase",
-    body: `
-            <div class="billing-confirm-details">
-                <div class="billing-confirm-row"><span>Package</span><strong>${name}</strong></div>
-                <div class="billing-confirm-row"><span>Credits</span><strong>${credits}</strong></div>
-                <div class="billing-confirm-row billing-confirm-total"><span>Total</span><strong>${price}</strong></div>
-            </div>
-            <p class="billing-confirm-note">⚠️ Demo mode: no real payment will be charged.</p>
-        `,
-    confirmText: "Confirm Purchase",
-    confirmClass: "billing-modal-confirm",
-    onConfirm: async () => {
-      try {
-        const res = await apiFetch("/monetization/credits/purchase", {
-          method: "POST",
-          body: JSON.stringify({ packageId: pkgId }),
-        });
-        if (res.success) {
-          toast(`✅ ${credits} credits added to your account!`, "success");
-          await loadStatus();
-        } else {
-          toast(res.error || "Purchase failed", "error");
-        }
-      } catch {
-        toast("Server unavailable. Try again later.", "error");
-      }
-    },
-  });
+    console.log("[billing] subscribe response:", res);
+
+    if (res.success && res.data?.checkoutUrl) {
+      window.location.href = res.data.checkoutUrl;
+    } else if (res.success && res.demo) {
+      toast(`✅ Demo: Obuna faollashtirildi!`, "success");
+      setTimeout(() => renderBilling(), 1000);
+    } else {
+      const errMsg = res.error?.message || res.error || "Xatolik yuz berdi";
+      toast("❌ " + errMsg, "error");
+    }
+  } catch (e) {
+    console.error("[billing] fetch error:", e);
+    toast(
+      "❌ Server bilan bog'lanib bo'lmadi. Serverni ishga tushiring.",
+      "error",
+    );
+  }
 }
 
-function showSubscribeConfirm({ tier, name, price }) {
-  showBillingModal({
-    title: "📅 Confirm Subscription",
-    body: `
-            <div class="billing-confirm-details">
-                <div class="billing-confirm-row"><span>Plan</span><strong>${name}</strong></div>
-                <div class="billing-confirm-row billing-confirm-total"><span>Price</span><strong>${price}</strong></div>
-            </div>
-            <p class="billing-confirm-note">⚠️ Demo mode: no real payment will be charged.</p>
-        `,
-    confirmText: "Activate Plan",
-    confirmClass: "billing-modal-confirm",
-    onConfirm: async () => {
-      try {
-        const res = await apiFetch("/monetization/subscriptions/create", {
-          method: "POST",
-          body: JSON.stringify({ tierId: tier }),
-        });
-        if (res.success) {
-          toast(`✅ ${name} activated!`, "success");
-          await loadStatus();
-        } else {
-          toast(res.error || "Subscription failed", "error");
-        }
-      } catch {
-        toast("Server unavailable. Try again later.", "error");
-      }
-    },
-  });
-}
+// ─── Confirm Modal ────────────────────────────────────────────────────────────
 
-async function cancelSubscription() {
-  showBillingModal({
-    title: "⚠️ Cancel Subscription",
-    body: `<p style="color:#64748b">Are you sure you want to cancel your subscription? You will lose access at the end of the billing period.</p>`,
-    confirmText: "Yes, Cancel",
-    confirmClass: "billing-modal-danger",
-    onConfirm: async () => {
-      try {
-        const res = await apiFetch("/monetization/subscriptions/cancel", {
-          method: "DELETE",
-        });
-        if (res.success) {
-          toast("Subscription cancelled.", "info");
-          await loadStatus();
-        } else {
-          toast(res.error || "Cancellation failed", "error");
-        }
-      } catch {
-        toast("Server unavailable.", "error");
-      }
-    },
-  });
-}
-
-// ─── Generic Modal ────────────────────────────────────────────────────────────
-
-function showBillingModal({
+function showConfirmModal({
   title,
-  body,
+  emoji,
+  rows,
+  note,
   confirmText,
-  confirmClass,
   onConfirm,
 }) {
-  document.getElementById("billingModal")?.remove();
+  document.getElementById("blModal")?.remove();
 
   const modal = document.createElement("div");
-  modal.id = "billingModal";
-  modal.className = "pm-modal";
+  modal.id = "blModal";
+  modal.className = "bl-modal-overlay";
   modal.innerHTML = `
-        <div class="pm-modal-box billing-modal-box">
-            <h3 class="billing-modal-title">${title}</h3>
-            <div class="billing-modal-body">${body}</div>
-            <div class="pm-modal-actions">
-                <button class="${confirmClass}" id="billingConfirmBtn">${confirmText}</button>
-                <button id="billingCancelBtn">Cancel</button>
-            </div>
-        </div>
-    `;
+    <div class="bl-modal">
+      <div class="bl-modal-emoji">${emoji}</div>
+      <h3 class="bl-modal-title">${title}</h3>
+      <div class="bl-modal-rows">
+        ${rows
+          .map(
+            ([k, v]) => `
+          <div class="bl-modal-row">
+            <span>${k}</span><strong>${v}</strong>
+          </div>
+        `,
+          )
+          .join("")}
+      </div>
+      ${note ? `<div class="bl-modal-note">ℹ️ ${note}</div>` : ""}
+      <div class="bl-modal-actions">
+        <button class="bl-modal-confirm" id="blConfirm">${confirmText}</button>
+        <button class="bl-modal-cancel" id="blCancel">Bekor qilish</button>
+      </div>
+    </div>
+  `;
 
   document.body.appendChild(modal);
 
-  modal.querySelector("#billingCancelBtn").onclick = () => modal.remove();
+  modal.querySelector("#blCancel").onclick = () => modal.remove();
   modal.addEventListener("click", (e) => {
     if (e.target === modal) modal.remove();
   });
-  modal.querySelector("#billingConfirmBtn").onclick = async () => {
-    modal.remove();
+
+  modal.querySelector("#blConfirm").onclick = async () => {
+    const btn = modal.querySelector("#blConfirm");
+    const cancelBtn = modal.querySelector("#blCancel");
+    btn.disabled = true;
+    cancelBtn.disabled = true;
+    btn.textContent = "⏳ Yuklanmoqda...";
     await onConfirm();
+    modal.remove();
   };
 }

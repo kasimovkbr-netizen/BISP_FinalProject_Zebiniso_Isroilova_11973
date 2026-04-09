@@ -1,12 +1,4 @@
-import { db, auth } from "./firebase.js";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-  deleteDoc,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { supabase } from "./supabase.js";
 
 let savedArticles = [];
 
@@ -14,40 +6,33 @@ export async function initSavedArticlesModule() {
   const grid = document.getElementById("savedArticlesGrid");
   if (!grid) return;
 
-  const user = auth.currentUser;
-  if (!user) return;
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return;
+
+  const userId = session.user.id;
 
   grid.innerHTML = `<div class="saved-article-card"><p>Loading...</p></div>`;
 
-  const bookmarkSnap = await getDocs(
-    query(collection(db, "user_bookmarks"), where("userId", "==", user.uid)),
-  );
+  const { data, error } = await supabase
+    .from("saved_articles")
+    .select(
+      "id, article_id, knowledge_base(id, title, summary, category, content)",
+    )
+    .eq("user_id", userId);
 
-  if (bookmarkSnap.empty) {
+  if (error) {
+    console.error("Error loading saved articles:", error);
     renderSavedArticles([]);
     return;
   }
 
-  savedArticles = [];
-
-  for (const bookmarkDoc of bookmarkSnap.docs) {
-    const articleId = bookmarkDoc.data().articleId;
-
-    const articleSnap = await getDocs(
-      query(
-        collection(db, "knowledge_base"),
-        where("__name__", "==", articleId),
-      ),
-    );
-
-    if (!articleSnap.empty) {
-      savedArticles.push({
-        bookmarkId: bookmarkDoc.id,
-        id: articleId,
-        ...articleSnap.docs[0].data(),
-      });
-    }
-  }
+  savedArticles = (data || []).map((row) => ({
+    bookmarkId: row.id,
+    id: row.article_id,
+    ...row.knowledge_base,
+  }));
 
   renderSavedArticles(savedArticles);
 }
@@ -101,26 +86,128 @@ export function getCategoryBadgeClass(category) {
   return map[category] || "";
 }
 
+export async function saveArticle(articleId) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return { error: "Not authenticated" };
+
+  const { data, error } = await supabase
+    .from("saved_articles")
+    .insert({ user_id: session.user.id, article_id: articleId });
+
+  return { data, error };
+}
+
+export async function unsaveArticle(articleId) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return { error: "Not authenticated" };
+
+  const { data, error } = await supabase
+    .from("saved_articles")
+    .delete()
+    .eq("user_id", session.user.id)
+    .eq("article_id", articleId);
+
+  return { data, error };
+}
+
 function openArticleDetail(article) {
   const existing = document.getElementById("savedArticleModal");
   if (existing) existing.remove();
 
+  const categoryColors = {
+    harmful: { bg: "#fef2f2", color: "#b91c1c", label: "⚠️ Harmful" },
+    immunity: { bg: "#f0fdf4", color: "#166534", label: "🛡️ Immunity" },
+    vaccines: { bg: "#eff6ff", color: "#1d4ed8", label: "💉 Vaccines" },
+    herbal: { bg: "#f0fdf4", color: "#15803d", label: "🌿 Herbal" },
+    nutrition: { bg: "#fefce8", color: "#854d0e", label: "🥗 Nutrition" },
+    sleep: { bg: "#f5f3ff", color: "#6d28d9", label: "😴 Sleep" },
+  };
+  const cat = categoryColors[article.category] || {
+    bg: "#f8fafc",
+    color: "#475569",
+    label: article.category || "",
+  };
+
+  const contentHtml = (article.content || "")
+    .split("\n")
+    .filter(Boolean)
+    .map(
+      (line) =>
+        `<p style="margin:0 0 10px;color:#374151;font-size:14px;line-height:1.7;">${escapeHtml(line)}</p>`,
+    )
+    .join("");
+
   const modal = document.createElement("div");
   modal.id = "savedArticleModal";
-  modal.className = "pm-modal";
-  modal.innerHTML = `
-    <div class="pm-modal-box">
-      <h3>${article.title || ""}</h3>
-      <p class="kb-summary">${article.summary || ""}</p>
-      <div class="kb-content">${article.content || ""}</div>
-      <button id="closeSavedArticleModal">Close</button>
-    </div>
+  modal.style.cssText = `
+    position:fixed;inset:0;background:rgba(15,23,42,0.5);
+    display:flex;align-items:center;justify-content:center;
+    z-index:3000;padding:20px;backdrop-filter:blur(4px);
   `;
+
+  modal.innerHTML = `
+    <div style="
+      background:#fff;border-radius:20px;width:100%;max-width:600px;
+      max-height:85vh;overflow:hidden;display:flex;flex-direction:column;
+      box-shadow:0 25px 60px rgba(0,0,0,0.25);animation:articleModalIn 0.25s ease;
+    ">
+      <!-- Header -->
+      <div style="padding:24px 24px 16px;border-bottom:1px solid #f1f5f9;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <span style="
+            background:${cat.bg};color:${cat.color};
+            padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;
+          ">${cat.label}</span>
+          <button id="closeSavedArticleModal" style="
+            background:#f1f5f9;border:none;border-radius:50%;
+            width:32px;height:32px;cursor:pointer;font-size:16px;
+            display:flex;align-items:center;justify-content:center;
+            color:#64748b;transition:background 0.2s;
+          ">✕</button>
+        </div>
+        <h2 style="font-size:20px;font-weight:700;color:#0f172a;margin:0 0 8px;">${escapeHtml(article.title || "")}</h2>
+        <p style="font-size:14px;color:#64748b;margin:0;font-style:italic;">${escapeHtml(article.summary || "")}</p>
+      </div>
+      <!-- Content -->
+      <div style="padding:20px 24px;overflow-y:auto;flex:1;">
+        ${contentHtml || `<p style="color:#94a3b8;font-size:14px;">No content available.</p>`}
+      </div>
+      <!-- Footer -->
+      <div style="padding:16px 24px;border-top:1px solid #f1f5f9;display:flex;justify-content:flex-end;">
+        <button id="closeSavedArticleModalFooter" style="
+          background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;
+          border:none;border-radius:12px;padding:10px 24px;
+          font-size:14px;font-weight:600;cursor:pointer;
+          transition:transform 0.15s,box-shadow 0.15s;
+        ">Close</button>
+      </div>
+    </div>
+    <style>
+      @keyframes articleModalIn {
+        from { opacity:0; transform:scale(0.95) translateY(10px); }
+        to { opacity:1; transform:scale(1) translateY(0); }
+      }
+    </style>
+  `;
+
   document.body.appendChild(modal);
-  document
-    .getElementById("closeSavedArticleModal")
-    .addEventListener("click", () => modal.remove());
+
+  const close = () => modal.remove();
+  document.getElementById("closeSavedArticleModal").onclick = close;
+  document.getElementById("closeSavedArticleModalFooter").onclick = close;
   modal.addEventListener("click", (e) => {
-    if (e.target === modal) modal.remove();
+    if (e.target === modal) close();
   });
+}
+
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }

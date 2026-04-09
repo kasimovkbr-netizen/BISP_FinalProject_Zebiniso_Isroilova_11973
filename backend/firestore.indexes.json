@@ -145,6 +145,20 @@
                     "order": "ASCENDING"
                 }
             ]
+        },
+        {
+            "collectionGroup": "vaccination_records",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "parentId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "childId",
+                    "order": "ASCENDING"
+                }
+            ]
         }
     ],
     "fieldOverrides": []

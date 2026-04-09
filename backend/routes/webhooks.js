@@ -1,85 +1,168 @@
 /**
- * Webhook Routes for AI Monetization System
- * 
- * Handles webhook events from external payment providers
- * Requires raw body parsing for signature verification
- */
-
-const express = require('express');
-const router = express.Router();
-const PaymentGateway = require('../services/PaymentGateway');
-
-/**
  * Stripe Webhook Handler
- * 
- * Processes Stripe webhook events with signature verification
- * Handles payment intents, subscriptions, and invoice events
+ *
+ * Events handled:
+ *   checkout.session.completed  → credit pack purchase OR subscription start
+ *   invoice.payment_succeeded   → monthly subscription renewal (add credits)
+ *   customer.subscription.deleted → subscription cancelled
  */
-router.post('/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
-    const signature = req.headers['stripe-signature'];
 
+"use strict";
+
+const express = require("express");
+const router = express.Router();
+const { stripe, verifyWebhookSignature } = require("../config/stripe");
+const { supabase } = require("../config/supabase");
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+async function addCredits(userId, amount) {
+  const { data: user } = await supabase
+    .from("users")
+    .select("credits")
+    .eq("id", userId)
+    .single();
+  const current = user?.credits || 0;
+  await supabase
+    .from("users")
+    .update({ credits: current + amount })
+    .eq("id", userId);
+  console.log(
+    `[webhook] +${amount} credits → user ${userId} (total: ${current + amount})`,
+  );
+}
+
+// ─── Stripe Webhook ───────────────────────────────────────────────────────────
+
+router.post(
+  "/stripe",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    const signature = req.headers["stripe-signature"];
     if (!signature) {
-        console.error('Missing Stripe signature header');
-        return res.status(400).json({
-            success: false,
-            error: {
-                code: 'missing_signature',
-                message: 'Missing Stripe signature header'
-            }
-        });
+      return res.status(400).json({ error: "Missing stripe-signature header" });
     }
+
+    let event;
+    try {
+      event = verifyWebhookSignature(req.body, signature);
+    } catch (err) {
+      console.error("[webhook] Signature verification failed:", err.message);
+      return res.status(400).json({ error: "Invalid signature" });
+    }
+
+    console.log(`[webhook] ${event.type} — ${event.id}`);
 
     try {
-        const paymentGateway = new PaymentGateway();
+      switch (event.type) {
+        // ── One-time credit pack purchase ──────────────────────────────────
+        case "checkout.session.completed": {
+          const session = event.data.object;
+          if (session.payment_status !== "paid") break;
 
-        // Verify webhook signature and construct event
-        const event = paymentGateway.verifyWebhook(req.body, signature);
+          const { userId, packageId, credits, tierId, creditsPerMonth } =
+            session.metadata || {};
 
-        console.log(`Received Stripe webhook: ${event.type} (ID: ${event.id})`);
+          if (packageId && credits) {
+            // One-time pack
+            await addCredits(userId, parseInt(credits));
+          } else if (tierId && creditsPerMonth) {
+            // Subscription first payment — add initial credits + save sub ID
+            const subscriptionId = session.subscription;
+            const sub = subscriptionId
+              ? await stripe.subscriptions.retrieve(subscriptionId)
+              : null;
 
-        // Process the webhook event
-        const result = await paymentGateway.handleWebhookEvent(event);
+            await supabase
+              .from("users")
+              .update({
+                stripe_subscription_id: subscriptionId || null,
+                subscription_status: "active",
+                subscription_period_end: sub
+                  ? new Date(sub.current_period_end * 1000).toISOString()
+                  : null,
+              })
+              .eq("id", userId);
 
-        if (result.success) {
-            console.log(`Successfully processed webhook: ${event.type}`);
-            res.status(200).json({
-                received: true,
-                eventId: event.id,
-                eventType: event.type
-            });
-        } else {
-            console.error('Webhook processing failed:', result.error);
-            res.status(500).json({
-                success: false,
-                error: result.error
-            });
+            await addCredits(userId, parseInt(creditsPerMonth));
+          }
+          break;
         }
-    } catch (error) {
-        console.error('Webhook signature verification failed:', error.message);
 
-        // Return 400 for signature verification failures
-        // This tells Stripe the webhook was received but invalid
-        return res.status(400).json({
-            success: false,
-            error: {
-                code: 'invalid_signature',
-                message: 'Invalid webhook signature'
-            }
-        });
+        // ── Monthly subscription renewal ───────────────────────────────────
+        case "invoice.payment_succeeded": {
+          const invoice = event.data.object;
+          // Only handle subscription renewals (not the first invoice, handled above)
+          if (invoice.billing_reason !== "subscription_cycle") break;
+
+          const customerId = invoice.customer;
+          const { data: user } = await supabase
+            .from("users")
+            .select("id, stripe_subscription_id")
+            .eq("stripe_customer_id", customerId)
+            .single();
+
+          if (!user) break;
+
+          // Add 500 credits for monthly renewal
+          await addCredits(user.id, 500);
+
+          // Update period end
+          if (invoice.subscription) {
+            const sub = await stripe.subscriptions.retrieve(
+              invoice.subscription,
+            );
+            await supabase
+              .from("users")
+              .update({
+                subscription_period_end: new Date(
+                  sub.current_period_end * 1000,
+                ).toISOString(),
+                subscription_status: "active",
+              })
+              .eq("id", user.id);
+          }
+          break;
+        }
+
+        // ── Subscription cancelled ─────────────────────────────────────────
+        case "customer.subscription.deleted": {
+          const sub = event.data.object;
+          const { data: user } = await supabase
+            .from("users")
+            .select("id")
+            .eq("stripe_customer_id", sub.customer)
+            .single();
+
+          if (user) {
+            await supabase
+              .from("users")
+              .update({
+                stripe_subscription_id: null,
+                subscription_status: null,
+                subscription_period_end: null,
+              })
+              .eq("id", user.id);
+            console.log(`[webhook] Subscription cancelled for user ${user.id}`);
+          }
+          break;
+        }
+
+        default:
+          break;
+      }
+
+      res.json({ received: true });
+    } catch (err) {
+      console.error("[webhook] Processing error:", err.message);
+      res.status(500).json({ error: "Webhook processing failed" });
     }
-});
+  },
+);
 
-/**
- * Webhook Health Check
- * 
- * Simple endpoint to verify webhook endpoint is accessible
- */
-router.get('/health', (req, res) => {
-    res.status(200).json({
-        success: true,
-        message: 'Webhook endpoint is healthy',
-        timestamp: new Date().toISOString()
-    });
+// Health check
+router.get("/health", (req, res) => {
+  res.json({ success: true, timestamp: new Date().toISOString() });
 });
 
 module.exports = router;

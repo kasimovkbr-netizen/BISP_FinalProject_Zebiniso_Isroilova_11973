@@ -1,42 +1,54 @@
-import { db, auth } from "./firebase.js";
-import {
-  collection,
-  addDoc,
-  doc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  onSnapshot,
-  serverTimestamp,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+// Requirements: 5.5, 5.6, 6.1–6.7
+import { supabase } from "./supabase.js";
 import { toast } from "./toast.js";
 
 let userId = null;
-let unsubscribe = null;
-let unsubscribeSupplements = null;
 let deleteTargetId = null;
+let channel = null;
+let childrenChannel = null;
 
 /* ======================
    INIT
 ====================== */
-export function initMedicineModule() {
-  onAuthStateChanged(auth, (user) => {
-    if (!user) return;
+export async function initMedicineModule() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-    userId = user.uid;
+  if (!session) {
+    window.location.href = "../auth/login.html";
+    return;
+  }
 
-    setupTabs();
-    setupMedicineForm();
-    setupConfirmModal(); // global confirmModal
-    loadChildrenDropdown(); // realtime dropdown + auto refresh list
-    setupChildFilter(); // change filter
-    loadMedicineList(""); // default: empty until child selected
-    loadSupplements(userId);
-    setupSupplementForm();
+  userId = session.user.id;
+
+  supabase.auth.onAuthStateChange((event, sess) => {
+    if (event === "SIGNED_OUT" || !sess) {
+      window.location.href = "../auth/login.html";
+    }
   });
+
+  setupTabs();
+  setupMedicineForm();
+  setupSupplementForm();
+  setupConfirmModal();
+  await loadChildrenDropdown();
+  setupChildFilter();
+  loadSupplements();
+}
+
+/* ======================
+   DESTROY (channel cleanup)
+====================== */
+export function destroyModule() {
+  if (channel) {
+    supabase.removeChannel(channel);
+    channel = null;
+  }
+  if (childrenChannel) {
+    supabase.removeChannel(childrenChannel);
+    childrenChannel = null;
+  }
 }
 
 /* ======================
@@ -54,6 +66,7 @@ export function setupTabs() {
         showChildMedicinesTab();
       } else if (tab === "my-supplements") {
         showSupplementsTab();
+        loadSupplements();
       }
     });
   });
@@ -93,154 +106,43 @@ function setupMedicineForm() {
 
     const name = document.getElementById("medicineName").value.trim();
     const dosage = document.getElementById("dosage").value.trim();
-    const timesPerDay = parseInt(
+    const times_per_day = parseInt(
       document.getElementById("timesPerDay").value,
       10,
     );
 
     const childSelect = document.getElementById("medicineChildSelect");
-    const childId = childSelect ? childSelect.value : "";
+    const child_id = childSelect ? childSelect.value : "";
 
-    if (!childId) {
+    if (!child_id) {
       toast("Please select a child before adding medicine.", "warning");
       return;
     }
 
-    if (!name || !dosage || !timesPerDay) return;
+    if (!name || !dosage || !times_per_day) return;
 
-    await addDoc(collection(db, "medicine_list"), {
-      parentId: userId,
-      childId,
+    const { error } = await supabase.from("medicine_list").insert({
+      parent_id: userId,
+      child_id,
       name,
       dosage,
-      timesPerDay,
-      createdAt: new Date(),
+      times_per_day,
+      created_at: new Date().toISOString(),
     });
 
+    if (error) {
+      console.error("[medicine] insert error:", error);
+      toast("Failed to add medicine. Please try again.", "error");
+      return;
+    }
+
     form.reset();
-    loadMedicineList(childId);
+    loadMedicineList(child_id);
   };
 }
 
 /* ======================
-   SUPPLEMENT FORM
-====================== */
-function setupSupplementForm() {
-  const form = document.getElementById("addSupplementForm");
-  if (!form) return;
-
-  // Remove any previous listener to avoid duplicates
-  form.onsubmit = null;
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    if (!userId) return;
-
-    const nameEl = document.getElementById("supplementName");
-    const dosageEl = document.getElementById("supplementDosage");
-    const timesEl = document.getElementById("supplementTimesPerDay");
-
-    const name = nameEl?.value.trim();
-    const dosage = dosageEl?.value.trim();
-    const timesPerDay = parseInt(timesEl?.value, 10);
-
-    if (!name || !dosage || !timesPerDay || timesPerDay < 1) return;
-
-    try {
-      await addSupplement(userId, { name, dosage, timesPerDay });
-      form.reset();
-    } catch (err) {
-      console.error("Add supplement error:", err);
-    }
-  });
-}
-
-/* ======================
-   SUPPLEMENTS — LOAD
-====================== */
-export function loadSupplements(uid) {
-  const ul = document.getElementById("supplementList");
-  if (!ul || !uid) return;
-
-  if (unsubscribeSupplements) unsubscribeSupplements();
-
-  const q = query(
-    collection(db, "supplements_list"),
-    where("userId", "==", uid),
-  );
-
-  unsubscribeSupplements = onSnapshot(q, (snapshot) => {
-    ul.innerHTML = "";
-
-    if (snapshot.empty) {
-      ul.style.display = "none";
-      return;
-    }
-    ul.style.display = "flex";
-
-    snapshot.forEach((docItem) => {
-      const data = docItem.data();
-      const li = document.createElement("li");
-
-      li.innerHTML = `
-        <span class="text">
-          ${escapeHtml(data.name)} — ${escapeHtml(data.dosage)} (${Number(data.timesPerDay)}x/day)
-        </span>
-        <div class="actions">
-          <button class="deleteBtn">Delete</button>
-        </div>
-      `;
-
-      li.querySelector(".deleteBtn").onclick = () => {
-        deleteSupplement(docItem.id, data.name);
-      };
-
-      ul.appendChild(li);
-    });
-  });
-}
-
-/* ======================
-   SUPPLEMENTS — ADD
-====================== */
-export async function addSupplement(uid, data) {
-  await addDoc(collection(db, "supplements_list"), {
-    userId: uid,
-    name: data.name,
-    dosage: data.dosage,
-    timesPerDay: data.timesPerDay,
-    createdAt: serverTimestamp(),
-  });
-}
-
-/* ======================
-   SUPPLEMENTS — DELETE
-====================== */
-export function deleteSupplement(id, name) {
-  deleteTargetId = id;
-
-  const modal = document.getElementById("confirmModal");
-  const text = document.getElementById("confirmText");
-  if (text) text.textContent = `Delete "${name}"?`;
-  if (modal) modal.classList.remove("hidden");
-
-  // Wire up yes button for supplement deletion
-  const yesBtn = document.getElementById("confirmYes");
-  if (yesBtn) {
-    yesBtn.onclick = async () => {
-      if (!deleteTargetId) return;
-      await deleteDoc(doc(db, "supplements_list", deleteTargetId));
-      modal.classList.add("hidden");
-      deleteTargetId = null;
-    };
-  }
-}
-
-/* ======================
    CONFIRM MODAL (GLOBAL)
-   dashboard.html dagi:
-   #confirmModal, #confirmYes, #confirmNo, #confirmText
 ====================== */
 let confirmWired = false;
 function setupConfirmModal() {
@@ -261,7 +163,15 @@ function setupConfirmModal() {
   yesBtn.onclick = async () => {
     if (!deleteTargetId) return;
 
-    await deleteDoc(doc(db, "medicine_list", deleteTargetId));
+    const { error } = await supabase
+      .from("medicine_list")
+      .delete()
+      .eq("id", deleteTargetId);
+
+    if (error) {
+      console.error("[medicine] delete error:", error);
+      toast("Failed to delete medicine.", "error");
+    }
 
     modal.classList.add("hidden");
     deleteTargetId = null;
@@ -271,37 +181,62 @@ function setupConfirmModal() {
 /* ======================
    CHILD DROPDOWN LOAD (REAL-TIME)
 ====================== */
-function loadChildrenDropdown() {
+async function loadChildrenDropdown() {
   const childSelect = document.getElementById("medicineChildSelect");
   if (!childSelect || !userId) return;
 
-  const childrenRef = collection(db, "children");
-  const q = query(childrenRef, where("parentId", "==", userId));
+  await refreshChildrenDropdown(childSelect);
 
-  onSnapshot(q, (snapshot) => {
-    const prevSelected = childSelect.value;
+  // Subscribe to children changes for real-time dropdown updates
+  childrenChannel = supabase
+    .channel("medicine-children-changes")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "children",
+        filter: `parent_id=eq.${userId}`,
+      },
+      async () => {
+        await refreshChildrenDropdown(childSelect);
+        loadMedicineList(childSelect.value);
+      },
+    )
+    .subscribe();
+}
 
-    childSelect.innerHTML = `<option value="">— Select child —</option>`;
+async function refreshChildrenDropdown(childSelect) {
+  const prevSelected = childSelect.value;
 
-    const existingIds = new Set();
-    snapshot.forEach((docItem) => {
-      existingIds.add(docItem.id);
+  const { data, error } = await supabase
+    .from("children")
+    .select("id, name")
+    .eq("parent_id", userId);
 
-      const data = docItem.data();
-      const option = document.createElement("option");
-      option.value = docItem.id;
-      option.textContent = data.name;
-      childSelect.appendChild(option);
-    });
+  if (error) {
+    console.error("[medicine] loadChildren error:", error);
+    return;
+  }
 
-    if (prevSelected && !existingIds.has(prevSelected)) {
-      childSelect.value = "";
-    } else {
-      childSelect.value = prevSelected;
-    }
+  childSelect.innerHTML = `<option value="">— Select child —</option>`;
 
-    loadMedicineList(childSelect.value);
+  const existingIds = new Set();
+  (data || []).forEach((child) => {
+    existingIds.add(child.id);
+    const option = document.createElement("option");
+    option.value = child.id;
+    option.textContent = child.name;
+    childSelect.appendChild(option);
   });
+
+  if (prevSelected && existingIds.has(prevSelected)) {
+    childSelect.value = prevSelected;
+  } else {
+    childSelect.value = "";
+  }
+
+  loadMedicineList(childSelect.value);
 }
 
 /* ======================
@@ -323,95 +258,146 @@ function loadMedicineList(selectedChildId = "") {
   const ul = document.getElementById("medicineList");
   if (!ul || !userId) return;
 
-  if (unsubscribe) unsubscribe();
+  // Unsubscribe previous channel
+  if (channel) {
+    supabase.removeChannel(channel);
+    channel = null;
+  }
 
   if (!selectedChildId) {
     ul.innerHTML = "";
     return;
   }
 
-  const q = query(
-    collection(db, "medicine_list"),
-    where("parentId", "==", userId),
-    where("childId", "==", selectedChildId),
-  );
+  // Initial fetch
+  fetchAndRenderMedicines(selectedChildId);
 
-  unsubscribe = onSnapshot(q, (snapshot) => {
-    ul.innerHTML = "";
+  // Subscribe to realtime changes
+  channel = supabase
+    .channel("medicine-list-changes")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "medicine_list",
+        filter: `parent_id=eq.${userId}`,
+      },
+      () => {
+        fetchAndRenderMedicines(selectedChildId);
+      },
+    )
+    .subscribe();
+}
 
-    if (snapshot.empty) {
-      ul.style.display = "none";
-    } else {
-      ul.style.display = "flex";
-    }
+async function fetchAndRenderMedicines(selectedChildId) {
+  const ul = document.getElementById("medicineList");
+  if (!ul || !userId) return;
 
-    snapshot.forEach((docItem) => {
-      const data = docItem.data();
-      const li = document.createElement("li");
+  const { data, error } = await supabase
+    .from("medicine_list")
+    .select("*")
+    .eq("parent_id", userId)
+    .eq("child_id", selectedChildId);
 
+  if (error) {
+    console.error("[medicine] fetchMedicines error:", error);
+    toast("Failed to load medicines.", "error");
+    return;
+  }
+
+  ul.innerHTML = "";
+
+  if (!data || data.length === 0) {
+    ul.style.display = "none";
+    return;
+  }
+
+  ul.style.display = "flex";
+
+  data.forEach((item) => {
+    const li = document.createElement("li");
+
+    li.innerHTML = `
+      <span class="text">
+        ${escapeHtml(item.name)} - ${escapeHtml(item.dosage)} (${Number(item.times_per_day)}x/day)
+      </span>
+
+      <div class="actions">
+        <button class="editBtn">Edit</button>
+        <button class="deleteBtn">Delete</button>
+      </div>
+    `;
+
+    // EDIT
+    li.querySelector(".editBtn").onclick = () => {
       li.innerHTML = `
-        <span class="text">
-          ${escapeHtml(data.name)} - ${escapeHtml(data.dosage)} (${Number(data.timesPerDay)}x/day)
-        </span>
+        <form class="editForm">
+          <input type="text" value="${escapeAttr(item.name)}" required>
+          <input type="text" value="${escapeAttr(item.dosage)}" required>
+          <input type="number" value="${Number(item.times_per_day)}" min="1" required>
 
-        <div class="actions">
-          <button class="editBtn">Edit</button>
-          <button class="deleteBtn">Delete</button>
-        </div>
+          <button type="submit" class="saveBtn">Save</button>
+          <button type="button" class="cancelBtn">Cancel</button>
+        </form>
       `;
 
-      // EDIT
-      li.querySelector(".editBtn").onclick = () => {
-        li.innerHTML = `
-          <form class="editForm">
-            <input type="text" value="${escapeAttr(data.name)}" required>
-            <input type="text" value="${escapeAttr(data.dosage)}" required>
-            <input type="number" value="${Number(data.timesPerDay)}" min="1" required>
+      const form = li.querySelector(".editForm");
+      form.querySelector(".cancelBtn").onclick = () =>
+        fetchAndRenderMedicines(selectedChildId);
 
-            <button type="submit" class="saveBtn">Save</button>
-            <button type="button" class="cancelBtn">Cancel</button>
-          </form>
-        `;
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const inputs = form.querySelectorAll("input");
 
-        const form = li.querySelector(".editForm");
-        form.querySelector(".cancelBtn").onclick = () =>
-          loadMedicineList(selectedChildId);
-
-        form.onsubmit = async (e) => {
-          e.preventDefault();
-          const inputs = form.querySelectorAll("input");
-
-          await updateDoc(doc(db, "medicine_list", docItem.id), {
+        const { error } = await supabase
+          .from("medicine_list")
+          .update({
             name: inputs[0].value.trim(),
             dosage: inputs[1].value.trim(),
-            timesPerDay: parseInt(inputs[2].value, 10),
-          });
-        };
-      };
+            times_per_day: parseInt(inputs[2].value, 10),
+          })
+          .eq("id", item.id);
 
-      // DELETE (GLOBAL MODAL)
-      li.querySelector(".deleteBtn").onclick = () => {
-        deleteTargetId = docItem.id;
-
-        const modal = document.getElementById("confirmModal");
-        const text = document.getElementById("confirmText");
-        if (text) text.textContent = `Delete "${data.name}"?`;
-        if (modal) modal.classList.remove("hidden");
-
-        // Re-wire yes button for medicine deletion
-        const yesBtn = document.getElementById("confirmYes");
-        if (yesBtn) {
-          yesBtn.onclick = async () => {
-            if (!deleteTargetId) return;
-            await deleteDoc(doc(db, "medicine_list", deleteTargetId));
-            modal.classList.add("hidden");
-            deleteTargetId = null;
-          };
+        if (error) {
+          console.error("[medicine] update error:", error);
+          toast("Failed to update medicine.", "error");
         }
       };
+    };
 
-      ul.appendChild(li);
-    });
+    // DELETE (GLOBAL MODAL)
+    li.querySelector(".deleteBtn").onclick = () => {
+      deleteTargetId = item.id;
+
+      const modal = document.getElementById("confirmModal");
+      const text = document.getElementById("confirmText");
+      if (text) text.textContent = `Delete "${item.name}"?`;
+      if (modal) modal.classList.remove("hidden");
+
+      // Re-wire yes button for medicine deletion
+      const yesBtn = document.getElementById("confirmYes");
+      if (yesBtn) {
+        yesBtn.onclick = async () => {
+          if (!deleteTargetId) return;
+
+          const { error } = await supabase
+            .from("medicine_list")
+            .delete()
+            .eq("id", deleteTargetId);
+
+          if (error) {
+            console.error("[medicine] delete error:", error);
+            toast("Failed to delete medicine.", "error");
+          }
+
+          modal.classList.add("hidden");
+          deleteTargetId = null;
+        };
+      }
+    };
+
+    ul.appendChild(li);
   });
 }
 
@@ -429,4 +415,94 @@ function escapeHtml(str) {
 
 function escapeAttr(str) {
   return escapeHtml(str).replaceAll("\n", " ");
+}
+
+/* ======================
+   SUPPLEMENTS (My Supplements tab)
+   Stored in medicine_list with child_id = null
+====================== */
+function setupSupplementForm() {
+  const form = document.getElementById("addSupplementForm");
+  if (!form) return;
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+
+    const name = document.getElementById("supplementName")?.value.trim();
+    const dosage = document.getElementById("supplementDosage")?.value.trim();
+    const times_per_day = parseInt(
+      document.getElementById("supplementTimes")?.value,
+      10,
+    );
+
+    if (!name || !dosage || !times_per_day) return;
+
+    const { error } = await supabase.from("medicine_list").insert({
+      parent_id: userId,
+      child_id: null,
+      name,
+      dosage,
+      times_per_day,
+      created_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      console.error("[supplement] insert error:", error);
+      toast("Failed to add supplement.", "error");
+      return;
+    }
+
+    form.reset();
+    loadSupplements();
+  };
+}
+
+async function loadSupplements() {
+  const ul = document.getElementById("supplementList");
+  if (!ul || !userId) return;
+
+  const { data, error } = await supabase
+    .from("medicine_list")
+    .select("*")
+    .eq("parent_id", userId)
+    .is("child_id", null);
+
+  if (error) {
+    console.error("[supplement] load error:", error);
+    return;
+  }
+
+  ul.innerHTML = "";
+
+  if (!data || data.length === 0) {
+    ul.innerHTML = `<li style="color:#94a3b8;padding:12px 0;">No supplements added yet.</li>`;
+    return;
+  }
+
+  data.forEach((item) => {
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <span class="text">
+        ${escapeHtml(item.name)} — ${escapeHtml(item.dosage)} (${Number(item.times_per_day)}x/day)
+      </span>
+      <div class="actions">
+        <button class="deleteBtn" data-id="${item.id}">Delete</button>
+      </div>
+    `;
+
+    li.querySelector(".deleteBtn").onclick = async () => {
+      const { error } = await supabase
+        .from("medicine_list")
+        .delete()
+        .eq("id", item.id);
+
+      if (error) {
+        toast("Failed to delete supplement.", "error");
+        return;
+      }
+      loadSupplements();
+    };
+
+    ul.appendChild(li);
+  });
 }

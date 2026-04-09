@@ -1,55 +1,496 @@
-import { db } from "./firebase.js";
-import {
-  collection,
-  getDocs,
-  deleteDoc,
-  doc,
-  addDoc,
-  updateDoc,
-  serverTimestamp,
-  query,
-  orderBy,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+// admin.module.js — Professional Admin Panel
+import { supabase } from "./supabase.js";
 import { toast } from "./toast.js";
 
 let allArticles = [];
+let allUsers = [];
+let currentTab = "dashboard";
 let searchDebounceTimer = null;
 
-export function initAdminModule() {
-  loadArticles();
-  setupSearch();
-  setupCategoryFilter();
+// ─── Init ─────────────────────────────────────────────────────────────────────
 
-  const addBtn = document.getElementById("adminAddBtn");
-  if (addBtn) {
-    addBtn.addEventListener("click", openAddArticleModal);
+export async function initAdminModule() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return;
+
+  const { data: userRow } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", session.user.id)
+    .single();
+
+  if (userRow?.role !== "admin") {
+    toast("Ruxsat yo'q: faqat admin", "error");
+    return;
+  }
+
+  renderAdminShell();
+  await loadDashboardStats();
+  setupAdminTabs();
+}
+
+export function checkAdminRole(role) {
+  return role === "admin";
+}
+
+// ─── Shell ────────────────────────────────────────────────────────────────────
+
+function renderAdminShell() {
+  const page = document.querySelector(".admin-page");
+  if (!page) return;
+
+  page.innerHTML = `
+    <div class="adm-header">
+      <div>
+        <div class="adm-title">👑 Admin Panel</div>
+        <div class="adm-sub">PediaMom boshqaruv markazi</div>
+      </div>
+    </div>
+
+    <div class="adm-tabs">
+      <button class="adm-tab active" data-tab="dashboard">📊 Dashboard</button>
+      <button class="adm-tab" data-tab="users">👥 Foydalanuvchilar</button>
+      <button class="adm-tab" data-tab="articles">📚 Maqolalar</button>
+      <button class="adm-tab" data-tab="credits">🪙 Kreditlar</button>
+      <button class="adm-tab" data-tab="feedback">💬 Fikrlar</button>
+    </div>
+
+    <div id="adm-content"></div>
+  `;
+}
+
+function setupAdminTabs() {
+  document.querySelectorAll(".adm-tab").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      document
+        .querySelectorAll(".adm-tab")
+        .forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentTab = btn.dataset.tab;
+      await loadTab(currentTab);
+    });
+  });
+}
+
+async function loadTab(tab) {
+  const content = document.getElementById("adm-content");
+  if (!content) return;
+  content.innerHTML = `<div class="adm-loading">⏳ Yuklanmoqda...</div>`;
+
+  switch (tab) {
+    case "dashboard":
+      await loadDashboardStats();
+      break;
+    case "users":
+      await loadUsers();
+      break;
+    case "articles":
+      await loadArticles();
+      break;
+    case "credits":
+      await loadCreditsTab();
+      break;
+    case "feedback":
+      await loadFeedback();
+      break;
   }
 }
+
+// ─── Dashboard Stats ──────────────────────────────────────────────────────────
+
+async function loadDashboardStats() {
+  const content = document.getElementById("adm-content");
+  if (!content) return;
+
+  const [
+    { count: usersCount },
+    { count: childrenCount },
+    { count: analysesCount },
+    { count: articlesCount },
+    { data: recentUsers },
+  ] = await Promise.all([
+    supabase.from("users").select("*", { count: "exact", head: true }),
+    supabase.from("children").select("*", { count: "exact", head: true }),
+    supabase
+      .from("medical_analyses")
+      .select("*", { count: "exact", head: true }),
+    supabase.from("knowledge_base").select("*", { count: "exact", head: true }),
+    supabase
+      .from("users")
+      .select("email, display_name, credits, created_at, role")
+      .order("created_at", { ascending: false })
+      .limit(5),
+  ]);
+
+  content.innerHTML = `
+    <div class="adm-stats-grid">
+      <div class="adm-stat-card" style="--c:#3b82f6">
+        <div class="adm-stat-icon">👥</div>
+        <div class="adm-stat-num">${usersCount || 0}</div>
+        <div class="adm-stat-label">Foydalanuvchilar</div>
+      </div>
+      <div class="adm-stat-card" style="--c:#8b5cf6">
+        <div class="adm-stat-icon">👶</div>
+        <div class="adm-stat-num">${childrenCount || 0}</div>
+        <div class="adm-stat-label">Bolalar</div>
+      </div>
+      <div class="adm-stat-card" style="--c:#059669">
+        <div class="adm-stat-icon">🧪</div>
+        <div class="adm-stat-num">${analysesCount || 0}</div>
+        <div class="adm-stat-label">Tahlillar</div>
+      </div>
+      <div class="adm-stat-card" style="--c:#f59e0b">
+        <div class="adm-stat-icon">📚</div>
+        <div class="adm-stat-num">${articlesCount || 0}</div>
+        <div class="adm-stat-label">Maqolalar</div>
+      </div>
+    </div>
+
+    <div class="adm-section">
+      <div class="adm-section-title">🕐 So'nggi foydalanuvchilar</div>
+      <div class="adm-table-wrap">
+        <table class="adm-table">
+          <thead><tr><th>Email</th><th>Ism</th><th>Kredit</th><th>Rol</th><th>Sana</th></tr></thead>
+          <tbody>
+            ${(recentUsers || [])
+              .map(
+                (u) => `
+              <tr>
+                <td>${esc(u.email)}</td>
+                <td>${esc(u.display_name || "—")}</td>
+                <td><span class="adm-badge blue">${u.credits || 0}</span></td>
+                <td><span class="adm-badge ${u.role === "admin" ? "red" : "gray"}">${u.role}</span></td>
+                <td>${new Date(u.created_at).toLocaleDateString("uz-UZ")}</td>
+              </tr>
+            `,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ─── Users Tab ────────────────────────────────────────────────────────────────
+
+async function loadUsers() {
+  const content = document.getElementById("adm-content");
+
+  const { data: users } = await supabase
+    .from("users")
+    .select(
+      "id, email, display_name, role, credits, telegram_chat_id, created_at",
+    )
+    .order("created_at", { ascending: false });
+
+  allUsers = users || [];
+
+  content.innerHTML = `
+    <div class="adm-toolbar">
+      <input class="adm-search" id="userSearch" placeholder="🔍 Email yoki ism bo'yicha qidirish..." />
+      <select class="adm-select" id="roleFilter">
+        <option value="">Barcha rollar</option>
+        <option value="parent">Parent</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+    <div id="usersTableWrap"></div>
+  `;
+
+  renderUsersTable(allUsers);
+
+  document.getElementById("userSearch").addEventListener("input", () => {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(filterUsers, 300);
+  });
+  document.getElementById("roleFilter").addEventListener("change", filterUsers);
+}
+
+function filterUsers() {
+  const q = document.getElementById("userSearch")?.value.toLowerCase() || "";
+  const role = document.getElementById("roleFilter")?.value || "";
+  const filtered = allUsers.filter((u) => {
+    const matchQ =
+      !q ||
+      (u.email || "").toLowerCase().includes(q) ||
+      (u.display_name || "").toLowerCase().includes(q);
+    const matchRole = !role || u.role === role;
+    return matchQ && matchRole;
+  });
+  renderUsersTable(filtered);
+}
+
+function renderUsersTable(users) {
+  const wrap = document.getElementById("usersTableWrap");
+  if (!wrap) return;
+
+  if (!users.length) {
+    wrap.innerHTML = `<div class="adm-empty">Foydalanuvchi topilmadi</div>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <div class="adm-table-wrap">
+      <table class="adm-table">
+        <thead>
+          <tr>
+            <th>Email</th><th>Ism</th><th>Rol</th>
+            <th>Kredit</th><th>Telegram</th><th>Sana</th><th>Amallar</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${users
+            .map(
+              (u) => `
+            <tr>
+              <td>${esc(u.email)}</td>
+              <td>${esc(u.display_name || "—")}</td>
+              <td><span class="adm-badge ${u.role === "admin" ? "red" : "gray"}">${u.role}</span></td>
+              <td><span class="adm-badge blue">${u.credits || 0}</span></td>
+              <td>${u.telegram_chat_id ? `<span class="adm-badge green">✓ ${u.telegram_chat_id}</span>` : '<span class="adm-badge gray">—</span>'}</td>
+              <td>${new Date(u.created_at).toLocaleDateString("uz-UZ")}</td>
+              <td class="adm-actions">
+                <button class="adm-btn-sm blue" onclick="window.__adminAddCredits('${u.id}','${esc(u.email)}')">+Kredit</button>
+                <button class="adm-btn-sm ${u.role === "admin" ? "gray" : "purple"}" onclick="window.__adminToggleRole('${u.id}','${u.role}')">
+                  ${u.role === "admin" ? "Parent qil" : "Admin qil"}
+                </button>
+              </td>
+            </tr>
+          `,
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  window.__adminAddCredits = (id, email) => showAddCreditsModal(id, email);
+  window.__adminToggleRole = (id, role) => toggleUserRole(id, role);
+}
+
+async function showAddCreditsModal(userId, email) {
+  const amount = prompt(`${email} ga necha kredit qo'shish?`, "50");
+  if (!amount || isNaN(amount) || parseInt(amount) <= 0) return;
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("credits")
+    .eq("id", userId)
+    .single();
+  const newCredits = (user?.credits || 0) + parseInt(amount);
+
+  const { error } = await supabase
+    .from("users")
+    .update({ credits: newCredits })
+    .eq("id", userId);
+  if (error) {
+    toast("Xato: " + error.message, "error");
+    return;
+  }
+
+  toast(
+    `✅ ${amount} kredit qo'shildi. Yangi balans: ${newCredits}`,
+    "success",
+  );
+  await loadUsers();
+}
+
+async function toggleUserRole(userId, currentRole) {
+  const newRole = currentRole === "admin" ? "parent" : "admin";
+  const confirmed = confirm(`Rolni "${newRole}" ga o'zgartirish?`);
+  if (!confirmed) return;
+
+  const { error } = await supabase
+    .from("users")
+    .update({ role: newRole })
+    .eq("id", userId);
+  if (error) {
+    toast("Xato: " + error.message, "error");
+    return;
+  }
+
+  toast(`✅ Rol "${newRole}" ga o'zgartirildi`, "success");
+  await loadUsers();
+}
+
+// ─── Articles Tab ─────────────────────────────────────────────────────────────
 
 async function loadArticles() {
-  try {
-    const q = query(collection(db, "knowledge_base"), orderBy("order", "asc"));
-    const snapshot = await getDocs(q);
-    allArticles = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-    applyFilters();
-  } catch (err) {
-    console.error("loadArticles error:", err);
-    const list = document.getElementById("adminArticlesList");
-    if (list)
-      list.innerHTML = `<p style="color:#ef4444;padding:20px;">Failed to load articles.</p>`;
-  }
+  const content = document.getElementById("adm-content");
+
+  const { data } = await supabase
+    .from("knowledge_base")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  allArticles = data || [];
+
+  content.innerHTML = `
+    <div class="adm-toolbar">
+      <input class="adm-search" id="adminSearch" placeholder="🔍 Maqola qidirish..." />
+      <select class="adm-select" id="adminCategoryFilter">
+        <option value="">Barcha kategoriyalar</option>
+        <option value="harmful">Zararli dorilar</option>
+        <option value="immunity">Immunitet</option>
+        <option value="vaccines">Emlash</option>
+        <option value="herbal">O'simlik ichimliklar</option>
+        <option value="nutrition">Ovqatlanish</option>
+        <option value="sleep">Uyqu</option>
+      </select>
+      <button class="adm-btn-primary" id="adminAddBtn">➕ Yangi maqola</button>
+    </div>
+    <div id="adminArticlesList"></div>
+  `;
+
+  renderArticles(allArticles);
+  setupSearch();
+  setupCategoryFilter();
+  document
+    .getElementById("adminAddBtn")
+    ?.addEventListener("click", openAddArticleModal);
 }
+
+// ─── Credits Tab ──────────────────────────────────────────────────────────────
+
+async function loadCreditsTab() {
+  const content = document.getElementById("adm-content");
+
+  const { data: topUsers } = await supabase
+    .from("users")
+    .select("email, display_name, credits")
+    .order("credits", { ascending: false })
+    .limit(20);
+
+  const { data: zeroUsers } = await supabase
+    .from("users")
+    .select("id, email, display_name, credits")
+    .eq("credits", 0);
+
+  content.innerHTML = `
+    <div class="adm-credits-grid">
+      <div class="adm-section">
+        <div class="adm-section-title">🏆 Eng ko'p kreditli foydalanuvchilar</div>
+        <div class="adm-table-wrap">
+          <table class="adm-table">
+            <thead><tr><th>Email</th><th>Ism</th><th>Kredit</th></tr></thead>
+            <tbody>
+              ${(topUsers || [])
+                .map(
+                  (u) => `
+                <tr>
+                  <td>${esc(u.email)}</td>
+                  <td>${esc(u.display_name || "—")}</td>
+                  <td><span class="adm-badge blue">${u.credits}</span></td>
+                </tr>
+              `,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="adm-section">
+        <div class="adm-section-title">⚠️ Kreditlari tugagan (${zeroUsers?.length || 0} ta)</div>
+        <button class="adm-btn-primary" id="giveAllCreditsBtn" style="margin-bottom:12px;">
+          🎁 Hammaga 10 kredit berish
+        </button>
+        <div class="adm-table-wrap">
+          <table class="adm-table">
+            <thead><tr><th>Email</th><th>Amal</th></tr></thead>
+            <tbody>
+              ${(zeroUsers || [])
+                .map(
+                  (u) => `
+                <tr>
+                  <td>${esc(u.email)}</td>
+                  <td><button class="adm-btn-sm blue" onclick="window.__adminAddCredits('${u.id}','${esc(u.email)}')">+Kredit</button></td>
+                </tr>
+              `,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  window.__adminAddCredits = (id, email) => showAddCreditsModal(id, email);
+
+  document
+    .getElementById("giveAllCreditsBtn")
+    ?.addEventListener("click", async () => {
+      if (!confirm(`${zeroUsers?.length} ta foydalanuvchiga 10 kredit berish?`))
+        return;
+      for (const u of zeroUsers || []) {
+        await supabase.from("users").update({ credits: 10 }).eq("id", u.id);
+      }
+      toast(
+        `✅ ${zeroUsers?.length} ta foydalanuvchiga 10 kredit berildi`,
+        "success",
+      );
+      await loadCreditsTab();
+    });
+}
+
+// ─── Feedback Tab ─────────────────────────────────────────────────────────────
+
+async function loadFeedback() {
+  const content = document.getElementById("adm-content");
+
+  const { data: tickets } = await supabase
+    .from("support_tickets")
+    .select("*, users(email)")
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (!tickets?.length) {
+    content.innerHTML = `<div class="adm-empty">Hali fikr-mulohazalar yo'q</div>`;
+    return;
+  }
+
+  content.innerHTML = `
+    <div class="adm-section">
+      <div class="adm-section-title">💬 Qo'llab-quvvatlash so'rovlari (${tickets.length})</div>
+      <div class="adm-table-wrap">
+        <table class="adm-table">
+          <thead><tr><th>Foydalanuvchi</th><th>Mavzu</th><th>Holat</th><th>Sana</th></tr></thead>
+          <tbody>
+            ${tickets
+              .map(
+                (t) => `
+              <tr>
+                <td>${esc(t.users?.email || "—")}</td>
+                <td>${esc(t.subject)}</td>
+                <td><span class="adm-badge ${t.status === "open" ? "red" : "green"}">${t.status}</span></td>
+                <td>${new Date(t.created_at).toLocaleDateString("uz-UZ")}</td>
+              </tr>
+            `,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ─── Articles CRUD ────────────────────────────────────────────────────────────
 
 export function filterArticles(articles, searchQuery, category) {
   const q = (searchQuery || "").toLowerCase().trim();
   const cat = (category || "").trim();
   return articles.filter((a) => {
-    const title = (a.title || "").toLowerCase();
-    const articleCat = (a.category || "").toLowerCase();
-    const matchesQuery =
-      q === "" || title.includes(q) || articleCat.includes(q);
-    const matchesCategory = cat === "" || a.category === cat;
-    return matchesQuery && matchesCategory;
+    const matchQ =
+      !q ||
+      (a.title || "").toLowerCase().includes(q) ||
+      (a.category || "").includes(q);
+    const matchCat = !cat || a.category === cat;
+    return matchQ && matchCat;
   });
 }
 
@@ -57,8 +498,8 @@ export function renderArticles(articles) {
   const list = document.getElementById("adminArticlesList");
   if (!list) return;
 
-  if (articles.length === 0) {
-    list.innerHTML = `<div class="admin-no-results">No articles found</div>`;
+  if (!articles.length) {
+    list.innerHTML = `<div class="adm-empty">Maqola topilmadi</div>`;
     return;
   }
 
@@ -66,243 +507,177 @@ export function renderArticles(articles) {
     .map(
       (a) => `
     <div class="admin-article-item">
-      <h4>${escapeHtml(a.title || "Untitled")}</h4>
-      <div class="admin-article-meta">
-        Category: <strong>${escapeHtml(a.category || "—")}</strong>
-        &nbsp;•&nbsp; Order: <strong>${a.order || "—"}</strong>
-        &nbsp;•&nbsp; Status: <span style="color:${a.status === "published" ? "#166534" : "#92400e"};font-weight:600;">${escapeHtml(a.status || "draft").toUpperCase()}</span>
-      </div>
-      <p style="font-size:14px;color:#475569;margin-bottom:10px;">${escapeHtml(a.summary || "")}</p>
-      <div class="admin-article-actions">
-        <button class="admin-edit-btn" data-id="${a.id}">✏️ Edit</button>
-        <button class="admin-delete-btn" data-id="${a.id}">🗑️ Delete</button>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+        <div style="flex:1">
+          <h4>${esc(a.title || "Nomsiz")}</h4>
+          <div class="admin-article-meta">
+            <span class="adm-badge ${catColor(a.category)}">${esc(a.category || "—")}</span>
+            <span style="color:#94a3b8;font-size:12px;margin-left:8px;">${new Date(a.created_at).toLocaleDateString("uz-UZ")}</span>
+          </div>
+          <p style="font-size:13px;color:#64748b;margin:8px 0 0;">${esc(a.summary || "")}</p>
+        </div>
+        <div class="admin-article-actions">
+          <button class="admin-edit-btn" data-id="${a.id}">✏️ Tahrir</button>
+          <button class="admin-delete-btn" data-id="${a.id}">🗑️ O'chirish</button>
+        </div>
       </div>
     </div>
   `,
     )
     .join("");
 
-  list.querySelectorAll(".admin-delete-btn").forEach((btn) => {
-    btn.addEventListener("click", () => deleteArticle(btn.dataset.id));
-  });
-  list.querySelectorAll(".admin-edit-btn").forEach((btn) => {
-    btn.addEventListener("click", () => openEditArticleModal(btn.dataset.id));
-  });
+  list
+    .querySelectorAll(".admin-delete-btn")
+    .forEach((btn) =>
+      btn.addEventListener("click", () => deleteArticle(btn.dataset.id)),
+    );
+  list
+    .querySelectorAll(".admin-edit-btn")
+    .forEach((btn) =>
+      btn.addEventListener("click", () => openEditArticleModal(btn.dataset.id)),
+    );
+}
+
+function catColor(cat) {
+  const map = {
+    harmful: "red",
+    immunity: "green",
+    vaccines: "blue",
+    herbal: "green",
+    nutrition: "yellow",
+    sleep: "purple",
+  };
+  return map[cat] || "gray";
 }
 
 function setupSearch() {
-  const searchInput = document.getElementById("adminSearch");
-  if (!searchInput) return;
-  searchInput.addEventListener("input", () => {
+  document.getElementById("adminSearch")?.addEventListener("input", () => {
     clearTimeout(searchDebounceTimer);
-    searchDebounceTimer = setTimeout(() => applyFilters(), 300);
+    searchDebounceTimer = setTimeout(applyFilters, 300);
   });
 }
 
 function setupCategoryFilter() {
-  const categorySelect = document.getElementById("adminCategoryFilter");
-  if (!categorySelect) return;
-  categorySelect.addEventListener("change", () => applyFilters());
+  document
+    .getElementById("adminCategoryFilter")
+    ?.addEventListener("change", applyFilters);
 }
 
 function applyFilters() {
-  const searchInput = document.getElementById("adminSearch");
-  const categorySelect = document.getElementById("adminCategoryFilter");
-  const q = searchInput ? searchInput.value : "";
-  const category = categorySelect ? categorySelect.value : "";
-  renderArticles(filterArticles(allArticles, q, category));
+  const q = document.getElementById("adminSearch")?.value || "";
+  const cat = document.getElementById("adminCategoryFilter")?.value || "";
+  renderArticles(filterArticles(allArticles, q, cat));
 }
+
+const CATEGORIES = [
+  "harmful",
+  "immunity",
+  "vaccines",
+  "herbal",
+  "nutrition",
+  "sleep",
+];
+const CAT_LABELS = {
+  harmful: "Zararli dorilar",
+  immunity: "Immunitet",
+  vaccines: "Emlash",
+  herbal: "O'simlik",
+  nutrition: "Ovqatlanish",
+  sleep: "Uyqu",
+};
 
 export function openAddArticleModal() {
-  const existing = document.getElementById("adminArticleModal");
-  if (existing) existing.remove();
-
-  const modal = document.createElement("div");
-  modal.id = "adminArticleModal";
-  modal.className = "admin-modal-overlay";
-  modal.innerHTML = `
-    <div class="admin-modal-box">
-      <h3>Add New Article</h3>
-      <form id="adminArticleForm">
-        <input type="text" id="articleTitle" placeholder="Title" required />
-        <input type="text" id="articleSummary" placeholder="Summary" required />
-        <textarea id="articleContent" placeholder="Content" rows="4" required></textarea>
-        <select id="articleCategory" required>
-          <option value="">Select category</option>
-          <option value="harmful">Harmful</option>
-          <option value="immunity">Immunity</option>
-          <option value="vaccines">Vaccines</option>
-          <option value="herbal">Herbal</option>
-          <option value="nutrition">Nutrition</option>
-          <option value="sleep">Sleep</option>
-        </select>
-        <select id="articleStatus">
-          <option value="published">Published</option>
-          <option value="draft">Draft</option>
-        </select>
-        <div class="admin-modal-actions">
-          <button type="submit" class="admin-add-btn">Save Article</button>
-          <button type="button" id="closeAdminModal">Cancel</button>
-        </div>
-      </form>
-    </div>
-  `;
-  document.body.appendChild(modal);
-  document
-    .getElementById("closeAdminModal")
-    .addEventListener("click", () => modal.remove());
-  modal.addEventListener("click", (e) => {
-    if (e.target === modal) modal.remove();
-  });
-  document
-    .getElementById("adminArticleForm")
-    .addEventListener("submit", async (e) => {
-      e.preventDefault();
-      await saveNewArticle();
-      modal.remove();
-    });
-}
-
-async function saveNewArticle() {
-  try {
-    await addDoc(collection(db, "knowledge_base"), {
-      title: document.getElementById("articleTitle").value.trim(),
-      summary: document.getElementById("articleSummary").value.trim(),
-      content: document.getElementById("articleContent").value.trim(),
-      category: document.getElementById("articleCategory").value,
-      status: document.getElementById("articleStatus").value,
-      order: allArticles.length + 1,
-      createdAt: serverTimestamp(),
-    });
-    await loadArticles();
-  } catch (err) {
-    console.error("saveNewArticle error:", err);
-    toast("Failed to save article.", "error");
-  }
+  showArticleModal({ title: "Yangi maqola qo'shish", article: null });
 }
 
 function openEditArticleModal(id) {
   const article = allArticles.find((a) => a.id === id);
   if (!article) return;
+  showArticleModal({ title: "Maqolani tahrirlash", article });
+}
 
-  const existing = document.getElementById("adminArticleModal");
-  if (existing) existing.remove();
-
+function showArticleModal({ title, article }) {
+  document.getElementById("adminArticleModal")?.remove();
   const modal = document.createElement("div");
   modal.id = "adminArticleModal";
   modal.className = "admin-modal-overlay";
   modal.innerHTML = `
-    <div class="admin-modal-box">
-      <h3>Edit Article</h3>
-      <form id="adminEditForm">
-        <input type="text" id="editTitle" placeholder="Title" value="${escapeHtml(article.title || "")}" required />
-        <input type="text" id="editSummary" placeholder="Summary" value="${escapeHtml(article.summary || "")}" required />
-        <textarea id="editContent" placeholder="Content" rows="4" required>${escapeHtml(article.content || "")}</textarea>
-        <select id="editCategory" required>
-          <option value="">Select category</option>
-          ${["harmful", "immunity", "vaccines", "herbal", "nutrition", "sleep"]
-            .map(
-              (c) =>
-                `<option value="${c}" ${article.category === c ? "selected" : ""}>${c.charAt(0).toUpperCase() + c.slice(1)}</option>`,
-            )
-            .join("")}
-        </select>
-        <select id="editStatus">
-          <option value="published" ${article.status === "published" ? "selected" : ""}>Published</option>
-          <option value="draft" ${article.status === "draft" ? "selected" : ""}>Draft</option>
+    <div class="admin-modal-box" style="max-width:560px;">
+      <h3>${title}</h3>
+      <form id="adminArticleForm">
+        <input type="text" id="artTitle" placeholder="Sarlavha *" value="${esc(article?.title || "")}" required />
+        <input type="text" id="artSummary" placeholder="Qisqacha tavsif *" value="${esc(article?.summary || "")}" required />
+        <textarea id="artContent" placeholder="To'liq matn *" rows="5" required>${esc(article?.content || "")}</textarea>
+        <textarea id="artWarning" placeholder="Ogohlantirish (ixtiyoriy)" rows="2">${esc(article?.warning || "")}</textarea>
+        <select id="artCategory" required>
+          <option value="">Kategoriya tanlang</option>
+          ${CATEGORIES.map((c) => `<option value="${c}" ${article?.category === c ? "selected" : ""}>${CAT_LABELS[c]}</option>`).join("")}
         </select>
         <div class="admin-modal-actions">
-          <button type="submit" class="admin-add-btn">Update Article</button>
-          <button type="button" id="closeAdminModal">Cancel</button>
+          <button type="submit" class="admin-add-btn">💾 Saqlash</button>
+          <button type="button" id="closeAdminModal">Bekor qilish</button>
         </div>
       </form>
     </div>
   `;
   document.body.appendChild(modal);
-  document
-    .getElementById("closeAdminModal")
-    .addEventListener("click", () => modal.remove());
+  modal.querySelector("#closeAdminModal").onclick = () => modal.remove();
   modal.addEventListener("click", (e) => {
     if (e.target === modal) modal.remove();
   });
-  document
-    .getElementById("adminEditForm")
+  modal
+    .querySelector("#adminArticleForm")
     .addEventListener("submit", async (e) => {
       e.preventDefault();
+      const data = {
+        title: document.getElementById("artTitle").value.trim(),
+        summary: document.getElementById("artSummary").value.trim(),
+        content: document.getElementById("artContent").value.trim(),
+        warning: document.getElementById("artWarning").value.trim() || null,
+        category: document.getElementById("artCategory").value,
+        updated_at: new Date().toISOString(),
+      };
       try {
-        await updateDoc(doc(db, "knowledge_base", id), {
-          title: document.getElementById("editTitle").value.trim(),
-          summary: document.getElementById("editSummary").value.trim(),
-          content: document.getElementById("editContent").value.trim(),
-          category: document.getElementById("editCategory").value,
-          status: document.getElementById("editStatus").value,
-          updatedAt: serverTimestamp(),
-        });
-        await loadArticles();
+        if (article) {
+          const { error } = await supabase
+            .from("knowledge_base")
+            .update(data)
+            .eq("id", article.id);
+          if (error) throw error;
+          toast("✅ Maqola yangilandi", "success");
+        } else {
+          const { error } = await supabase
+            .from("knowledge_base")
+            .insert({ ...data, created_at: new Date().toISOString() });
+          if (error) throw error;
+          toast("✅ Maqola qo'shildi", "success");
+        }
         modal.remove();
+        await loadArticles();
       } catch (err) {
-        console.error("updateArticle error:", err);
-        toast("Failed to update article.", "error");
+        toast("Xato: " + err.message, "error");
       }
     });
 }
 
 export async function deleteArticle(id) {
-  // Use custom confirm modal instead of browser confirm()
-  const confirmed = await showConfirmToast("Delete this article?");
-  if (!confirmed) return;
-  try {
-    await deleteDoc(doc(db, "knowledge_base", id));
-    allArticles = allArticles.filter((a) => a.id !== id);
-    applyFilters();
-    toast("Article deleted.", "success");
-  } catch (err) {
-    console.error("deleteArticle error:", err);
-    toast("Failed to delete article.", "error");
+  if (!confirm("Bu maqolani o'chirishni tasdiqlaysizmi?")) return;
+  const { error } = await supabase.from("knowledge_base").delete().eq("id", id);
+  if (error) {
+    toast("Xato: " + error.message, "error");
+    return;
   }
+  allArticles = allArticles.filter((a) => a.id !== id);
+  applyFilters();
+  toast("✅ Maqola o'chirildi", "success");
 }
 
-function escapeHtml(str) {
-  return String(str)
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function esc(str) {
+  return String(str || "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
-}
-
-/**
- * Inline confirm dialog using the global pm-modal.
- * Returns a Promise<boolean>.
- */
-function showConfirmToast(message) {
-  return new Promise((resolve) => {
-    const modal = document.getElementById("confirmModal");
-    const text = document.getElementById("confirmText");
-    const yesBtn = document.getElementById("confirmYes");
-    const noBtn = document.getElementById("confirmNo");
-
-    if (!modal || !yesBtn || !noBtn) {
-      // Fallback if modal not in DOM
-      resolve(window.confirm(message));
-      return;
-    }
-
-    if (text) text.textContent = message;
-    modal.classList.remove("hidden");
-
-    const cleanup = () => {
-      modal.classList.add("hidden");
-      yesBtn.onclick = null;
-      noBtn.onclick = null;
-    };
-
-    yesBtn.onclick = () => {
-      cleanup();
-      resolve(true);
-    };
-    noBtn.onclick = () => {
-      cleanup();
-      resolve(false);
-    };
-  });
 }
