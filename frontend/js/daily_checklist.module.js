@@ -1,5 +1,6 @@
 // Requirements: 5.6, 6.4
 import { supabase } from "./supabase.js";
+import { t } from "./i18n.js";
 
 let userId = null;
 let selectedChildId = "";
@@ -60,7 +61,7 @@ async function loadChildrenDropdown() {
     return;
   }
 
-  select.innerHTML = `<option value="">— Select child —</option>`;
+  select.innerHTML = `<option value="">— ${t("select_child")} —</option>`;
   (data || []).forEach((child) => {
     const opt = document.createElement("option");
     opt.value = child.id;
@@ -96,7 +97,9 @@ function setupChildFilter() {
 /* ======================
    DAILY CHECKLIST
 ====================== */
-const TIME_SLOTS = ["Morning", "Afternoon", "Evening", "Night"];
+const TIME_SLOTS_EN = ["Morning", "Afternoon", "Evening", "Night"];
+const TIME_SLOTS_KEYS = ["morning", "afternoon", "evening", "night"];
+const TIME_SLOTS = TIME_SLOTS_EN; // used for DB storage (always English)
 
 function loadChecklistRealtime() {
   // Initial render
@@ -158,8 +161,11 @@ async function renderChecklist() {
       const taken = existingLog ? existingLog.taken : false;
 
       const li = document.createElement("li");
+      const slotLabel =
+        t(TIME_SLOTS_KEYS[TIME_SLOTS.indexOf(slot)] || slot.toLowerCase()) ||
+        slot;
       li.innerHTML = `
-        <label>${med.name} – ${med.dosage} (${slot})</label>
+        <label>${med.name} – ${med.dosage} (${slotLabel})</label>
         <input type="checkbox" ${taken ? "checked" : ""}>
       `;
 
@@ -236,7 +242,7 @@ async function checkMissedYesterday() {
   }
 
   if (data.every((d) => d.taken === false)) {
-    warning.innerHTML = `⚠️ Yesterday you missed your medicines`;
+    warning.innerHTML = `⚠️ ${t("missed_yesterday") !== "missed_yesterday" ? t("missed_yesterday") : "Yesterday you missed your medicines"}`;
     warning.classList.remove("hidden");
   } else {
     warning.classList.add("hidden");

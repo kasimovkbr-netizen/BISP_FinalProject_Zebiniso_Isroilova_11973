@@ -1,6 +1,7 @@
 // Requirements: 5.5, 5.6, 6.1–6.7
 import { supabase } from "./supabase.js";
 import { toast } from "./toast.js";
+import { t } from "./i18n.js";
 
 let userId = null;
 let deleteTargetId = null;
@@ -115,7 +116,7 @@ function setupMedicineForm() {
     const child_id = childSelect ? childSelect.value : "";
 
     if (!child_id) {
-      toast("Please select a child before adding medicine.", "warning");
+      toast(t("select_child_first"), "warning");
       return;
     }
 
@@ -219,7 +220,7 @@ async function refreshChildrenDropdown(childSelect) {
     return;
   }
 
-  childSelect.innerHTML = `<option value="">— Select child —</option>`;
+  childSelect.innerHTML = `<option value="">— ${t("select_child")} —</option>`;
 
   const existingIds = new Set();
   (data || []).forEach((child) => {
@@ -320,12 +321,11 @@ async function fetchAndRenderMedicines(selectedChildId) {
 
     li.innerHTML = `
       <span class="text">
-        ${escapeHtml(item.name)} - ${escapeHtml(item.dosage)} (${Number(item.times_per_day)}x/day)
+        ${escapeHtml(item.name)} - ${escapeHtml(item.dosage)} (${Number(item.times_per_day)}x/${t("day_short") !== "day_short" ? t("day_short") : "day"})
       </span>
-
       <div class="actions">
-        <button class="editBtn">Edit</button>
-        <button class="deleteBtn">Delete</button>
+        <button class="editBtn">${t("edit")}</button>
+        <button class="deleteBtn">${t("delete")}</button>
       </div>
     `;
 
@@ -337,8 +337,8 @@ async function fetchAndRenderMedicines(selectedChildId) {
           <input type="text" value="${escapeAttr(item.dosage)}" required>
           <input type="number" value="${Number(item.times_per_day)}" min="1" required>
 
-          <button type="submit" class="saveBtn">Save</button>
-          <button type="button" class="cancelBtn">Cancel</button>
+          <button type="submit" class="saveBtn">${t("save")}</button>
+          <button type="button" class="cancelBtn">${t("cancel")}</button>
         </form>
       `;
 
@@ -475,7 +475,7 @@ async function loadSupplements() {
   ul.innerHTML = "";
 
   if (!data || data.length === 0) {
-    ul.innerHTML = `<li style="color:#94a3b8;padding:12px 0;">No supplements added yet.</li>`;
+    ul.innerHTML = `<li style="color:#94a3b8;padding:12px 0;">${t("no_supplements")}</li>`;
     return;
   }
 
@@ -483,10 +483,10 @@ async function loadSupplements() {
     const li = document.createElement("li");
     li.innerHTML = `
       <span class="text">
-        ${escapeHtml(item.name)} — ${escapeHtml(item.dosage)} (${Number(item.times_per_day)}x/day)
+        ${escapeHtml(item.name)} — ${escapeHtml(item.dosage)} (${Number(item.times_per_day)}x/${t("day_short") !== "day_short" ? t("day_short") : "day"})
       </span>
       <div class="actions">
-        <button class="deleteBtn" data-id="${item.id}">Delete</button>
+        <button class="deleteBtn" data-id="${item.id}">${t("delete")}</button>
       </div>
     `;
 

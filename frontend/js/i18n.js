@@ -99,7 +99,10 @@ Object.assign(TRANSLATIONS.en, {
   warning: "Warning",
   are_you_sure: "Are you sure?",
   something_went_wrong: "Something went wrong. Please try again.",
-  // DASHBOARD HOME
+  required_field: "is required",
+  months_short: "mo",
+  years_short: "yrs",
+  day_short: "day",
   welcome_back: "Welcome back 👋",
   quick_actions: "Quick Actions",
   add_child: "Add Child",
@@ -133,6 +136,7 @@ Object.assign(TRANSLATIONS.en, {
   afternoon: "Afternoon",
   evening: "Evening",
   night: "Night",
+  missed_yesterday: "Yesterday you missed your medicines",
   // VACCINATION
   vaccination_title: "Vaccination Tracker",
   select_child_placeholder: "— Select child —",
@@ -352,7 +356,10 @@ Object.assign(TRANSLATIONS.uz, {
   warning: "Ogohlantirish",
   are_you_sure: "Tasdiqlaysizmi?",
   something_went_wrong: "Nimadir noto'g'ri bo'ldi. Qayta urinib ko'ring.",
-  // DASHBOARD HOME
+  required_field: "kiritilmadi",
+  months_short: "oy",
+  years_short: "yosh",
+  day_short: "kun",
   welcome_back: "Xush kelibsiz 👋",
   quick_actions: "Tez amallar",
   add_child: "Bola qo'shish",
@@ -385,6 +392,8 @@ Object.assign(TRANSLATIONS.uz, {
   morning: "Ertalab",
   afternoon: "Kunduzi",
   evening: "Kechqurun",
+  night: "Tungi",
+  missed_yesterday: "Kecha dorilarni unutdingiz",
   night: "Tungi",
   // VACCINATION
   vaccination_title: "Emlash kuzatuvchisi",

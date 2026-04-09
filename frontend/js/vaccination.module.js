@@ -3,6 +3,7 @@
 
 import { supabase } from "./supabase.js";
 import { UZ_VACCINE_SCHEDULE } from "./uz_vaccine_schedule.js";
+import { t } from "./i18n.js";
 import {
   computeScheduledDate,
   deriveStatus,
@@ -68,7 +69,7 @@ async function loadChildrenDropdown() {
     return;
   }
 
-  select.innerHTML = `<option value="">— Select child —</option>`;
+  select.innerHTML = `<option value="">— ${t("select_child")} —</option>`;
   (data || []).forEach((child) => {
     const opt = document.createElement("option");
     opt.value = child.id;
@@ -164,7 +165,7 @@ async function fetchAndRenderVaccinations(childId) {
       <div class="vax-info">
         <span class="vax-name">${record.vaccine_name}</span>
         <span class="vax-date">📅 ${record.scheduled_date}</span>
-        <span class="vax-status">${status}</span>
+        <span class="vax-status">${t(status) || status}</span>
       </div>
     `;
 

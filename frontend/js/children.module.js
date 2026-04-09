@@ -3,6 +3,7 @@ import { supabase } from "./supabase.js";
 import { computeScheduledDate } from "./vaccination_utils.js";
 import { UZ_VACCINE_SCHEDULE } from "./uz_vaccine_schedule.js";
 import { generateVaccinationRecords } from "./vaccination.module.js";
+import { t } from "./i18n.js";
 
 let userId = null;
 let editId = null;
@@ -83,8 +84,7 @@ async function loadChildren() {
     list.innerHTML = `<li class="child-empty">
       <div style="text-align:center;padding:32px;color:#94a3b8;">
         <div style="font-size:48px;margin-bottom:12px;">👶</div>
-        <div style="font-size:15px;font-weight:600;">Hali bola qo'shilmagan</div>
-        <div style="font-size:13px;margin-top:4px;">Quyidagi tugmani bosib bola qo'shing</div>
+        <div style="font-size:15px;font-weight:600;">${t("no_children")}</div>
       </div>
     </li>`;
     return;
@@ -95,7 +95,9 @@ async function loadChildren() {
     li.className = "child-card";
 
     const ageLabel =
-      c.age_unit === "months" ? `${c.age ?? 0} oy` : `${c.age ?? 0} yosh`;
+      c.age_unit === "months"
+        ? `${c.age ?? 0} ${t("months_short") !== "months_short" ? t("months_short") : "oy"}`
+        : `${c.age ?? 0} ${t("years_short") !== "years_short" ? t("years_short") : "yosh"}`;
 
     const genderIcon =
       c.gender === "male" ? "👦" : c.gender === "female" ? "👧" : "👶";
@@ -117,8 +119,8 @@ async function loadChildren() {
         </div>
       </div>
       <div class="child-actions">
-        <button class="editBtn" data-id="${c.id}">✏️ Tahrir</button>
-        <button class="deleteBtn" data-id="${c.id}">🗑️ O'chirish</button>
+        <button class="editBtn" data-id="${c.id}">✏️ ${t("edit")}</button>
+        <button class="deleteBtn" data-id="${c.id}">🗑️ ${t("delete")}</button>
       </div>
     `;
 
@@ -203,15 +205,15 @@ async function handleFormSubmit(e) {
     const birth_date = document.getElementById("birthDate")?.value || null;
 
     if (!name) {
-      showFormError("Ism kiritilmadi");
+      showFormError(t("child_name") + " " + t("required_field"));
       return;
     }
     if (!age || age <= 0) {
-      showFormError("Yosh kiritilmadi");
+      showFormError(t("age") + " " + t("required_field"));
       return;
     }
     if (!gender) {
-      showFormError("Jins tanlanmadi");
+      showFormError(t("select_gender"));
       return;
     }
 
@@ -259,7 +261,7 @@ async function handleFormSubmit(e) {
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
-      submitBtn.textContent = "Saqlash";
+      submitBtn.textContent = t("save");
     }
   }
 }
@@ -288,7 +290,7 @@ function openModal(child = null) {
   modal.classList.remove("hidden");
 
   const title = document.getElementById("childModalTitle");
-  if (title) title.textContent = editId ? "Bolani tahrirlash" : "Bola qo'shish";
+  if (title) title.textContent = editId ? t("edit_child") : t("add_child");
 
   document.getElementById("childName").value = child?.name || "";
   document.getElementById("age").value = child?.age || "";
@@ -324,8 +326,7 @@ function confirmDelete(id, name) {
   pendingDeleteId = id;
   const modal = document.getElementById("confirmModal");
   const text = document.getElementById("confirmText");
-  if (text)
-    text.textContent = `"${name}" ni o'chirishni tasdiqlaysizmi? Barcha ma'lumotlar o'chadi.`;
+  if (text) text.textContent = `"${name}" ${t("delete_child_confirm")}`;
   modal?.classList.remove("hidden");
 }
 

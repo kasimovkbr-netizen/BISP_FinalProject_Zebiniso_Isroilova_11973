@@ -1,8 +1,7 @@
 // family.module.js
-// Tables: emergency_contacts, pediatrician_info, insurance_info,
-//         blood_type_records, health_goals, daily_notes
 import { supabase } from "./supabase.js";
 import { toast } from "./toast.js";
+import { t } from "./i18n.js";
 
 let userId = null;
 let children = [];
@@ -28,7 +27,7 @@ export function destroyFamilyModule() {
 }
 
 function childOpts() {
-  return `<option value="">— Bola tanlang —</option>${children.map((c) => `<option value="${c.id}">${c.name}</option>`).join("")}`;
+  return `<option value="">— ${t("select_child")} —</option>${children.map((c) => `<option value="${c.id}">${c.name}</option>`).join("")}`;
 }
 
 function renderShell() {
@@ -36,16 +35,16 @@ function renderShell() {
   if (!page) return;
   page.innerHTML = `
     <div class="adm-header">
-      <div class="adm-title">👨‍👩‍👧 Oila Ma'lumotlari</div>
-      <div class="adm-sub">Shoshilinch aloqa, shifokor, sug'urta, qon guruhi, maqsadlar</div>
+      <div class="adm-title">👨‍👩‍👧 ${t("family_title")}</div>
+      <div class="adm-sub">${t("family_subtitle")}</div>
     </div>
     <div class="adm-tabs" id="famTabs">
-      <button class="adm-tab active" data-tab="emergency">🆘 Shoshilinch</button>
-      <button class="adm-tab" data-tab="pediatrician">👨‍⚕️ Shifokor</button>
-      <button class="adm-tab" data-tab="insurance">🛡️ Sug'urta</button>
-      <button class="adm-tab" data-tab="bloodtype">🩸 Qon guruhi</button>
-      <button class="adm-tab" data-tab="goals">🎯 Maqsadlar</button>
-      <button class="adm-tab" data-tab="notes">📝 Kunlik eslatmalar</button>
+      <button class="adm-tab active" data-tab="emergency">${t("emergency")}</button>
+      <button class="adm-tab" data-tab="pediatrician">${t("pediatrician")}</button>
+      <button class="adm-tab" data-tab="insurance">${t("insurance")}</button>
+      <button class="adm-tab" data-tab="bloodtype">${t("blood_type")}</button>
+      <button class="adm-tab" data-tab="goals">${t("goals")}</button>
+      <button class="adm-tab" data-tab="notes">${t("daily_notes")}</button>
     </div>
     <div id="famContent"></div>
   `;
@@ -67,7 +66,7 @@ function setupTabs() {
 async function loadTab(tab) {
   const el = document.getElementById("famContent");
   if (!el) return;
-  el.innerHTML = `<div class="adm-loading">⏳ Yuklanmoqda...</div>`;
+  el.innerHTML = `<div class="adm-loading">⏳ ${t("loading")}...</div>`;
   switch (tab) {
     case "emergency":
       await renderEmergency(el);

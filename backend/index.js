@@ -47,6 +47,7 @@ app.use(
       }
       const allowed = [
         process.env.FRONTEND_URL,
+        process.env.FRONTEND_URL_2,
         "http://localhost:5500",
         "http://127.0.0.1:5500",
         "http://localhost:5501",
@@ -54,6 +55,10 @@ app.use(
         "http://localhost:3000",
         "http://127.0.0.1:3000",
       ].filter(Boolean);
+      // Allow any vercel.app domain
+      if (origin.endsWith(".vercel.app")) return callback(null, true);
+      // Allow exact Vercel production URL
+      if (origin === "https://pediamom.vercel.app") return callback(null, true);
       if (allowed.includes(origin)) return callback(null, true);
       callback(new Error("Not allowed by CORS"));
     },
