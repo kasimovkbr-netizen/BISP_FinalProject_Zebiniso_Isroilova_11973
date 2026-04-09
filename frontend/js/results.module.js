@@ -1,6 +1,6 @@
 // results.module.js
-// Requirements: 5.10, 11.5, 11.7
 import { supabase } from "./supabase.js";
+import { t } from "./i18n.js";
 
 let uid = null;
 let realtimeChannel = null;
@@ -168,7 +168,7 @@ async function loadChildrenIntoFilter(parentId) {
     .eq("parent_id", parentId);
 
   childrenMap = {};
-  childFilter.innerHTML = `<option value="">All Children</option>`;
+  childFilter.innerHTML = `<option value="">${t("all_children")}</option>`;
 
   (data || []).forEach((child) => {
     childrenMap[child.id] = child.name;
@@ -216,10 +216,16 @@ async function loadResults(parentId) {
       .map((kv) => `<span class="value-chip">${kv}</span>`)
       .join("");
 
+    const aiLabel =
+      t("ai_analysis") !== "ai_analysis" ? t("ai_analysis") : "AI Tahlil";
+    const recsLabel =
+      t("recommendations") !== "recommendations"
+        ? t("recommendations")
+        : "Tavsiyalar";
     const aiHTML = result.ai_result
       ? `
       <div class="ai-result-inline">
-        <div class="ai-result-label">🤖 AI Tahlil</div>
+        <div class="ai-result-label">🤖 ${aiLabel}</div>
         <p class="ai-result-text">${result.ai_result.interpretation || ""}</p>
         ${
           result.ai_result.recommendations?.length
@@ -244,8 +250,8 @@ async function loadResults(parentId) {
         <div class="date">📅 ${result.created_at ? new Date(result.created_at).toLocaleString() : "N/A"}</div>
       </div>
       <div class="actions">
-        <button data-id="${result.id}" class="editBtn">✏️ Edit</button>
-        <button data-id="${result.id}" class="deleteBtn">🗑 Delete</button>
+        <button data-id="${result.id}" class="editBtn">✏️ ${t("edit")}</button>
+        <button data-id="${result.id}" class="deleteBtn">🗑 ${t("delete")}</button>
       </div>
     `;
     resultsList.appendChild(li);
@@ -306,8 +312,7 @@ function bindDeleteButtons(parentId) {
           return;
         }
 
-        if (text)
-          text.textContent = "Are you sure you want to delete this analysis?";
+        if (text) text.textContent = t("delete_analysis_confirm");
         modal.classList.remove("hidden");
 
         const cleanup = () => {
@@ -334,7 +339,7 @@ function bindDeleteButtons(parentId) {
         if (error) throw error;
         await loadResults(parentId);
         await updateTrendChart(parentId);
-        showMessage("Analysis deleted!", "success");
+        showMessage(t("analysis_deleted"), "success");
       } catch (err) {
         console.error(err);
         showMessage("Error deleting analysis!", "error");

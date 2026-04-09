@@ -40,102 +40,78 @@ document.addEventListener("DOMContentLoaded", async () => {
       </div>
     `,
 
-    children: `<div class="children-page">
+    children: () => `<div class="children-page">
   <div class="children-header">
-    <h2>My Children</h2>
+    <h2>${t("my_children")}</h2>
   </div>
-
   <ul id="childList"></ul>
-
-  <!-- ADD / EDIT MODAL -->
   <div id="childModal" class="pm-modal hidden">
     <div class="pm-modal-box">
-      <h3 id="childModalTitle">Add Child</h3>
-
+      <h3 id="childModalTitle">${t("add_child")}</h3>
       <form id="childForm">
-        <input type="text" id="childName" name="childName" placeholder="Child name" required />
-
+        <input type="text" id="childName" name="childName" placeholder="${t("child_name")}" required />
         <div class="age-input-group">
-          <input type="number" id="age" name="age" placeholder="Age" min="0" required />
+          <input type="number" id="age" name="age" placeholder="${t("age")}" min="0" required />
           <div class="age-unit-toggle">
-            <button type="button" id="ageUnitYears" class="active">yrs</button>
-            <button type="button" id="ageUnitMonths">mo</button>
+            <button type="button" id="ageUnitYears" class="active">${t("years_short")}</button>
+            <button type="button" id="ageUnitMonths">${t("months_short")}</button>
           </div>
         </div>
         <input type="hidden" id="ageUnit" value="years" />
-
         <select id="gender" name="gender" required>
-          <option value="">Select gender</option>
-          <option value="male">Male</option>
-          <option value="female">Female</option>
+          <option value="">${t("select_gender")}</option>
+          <option value="male">${t("male")}</option>
+          <option value="female">${t("female")}</option>
         </select>
-
         <div style="margin-top:12px;">
-          <label style="font-size:13px;color:#64748b;display:block;margin-bottom:4px;">Birth Date (optional)</label>
+          <label style="font-size:13px;color:#64748b;display:block;margin-bottom:4px;">${t("birth_date")}</label>
           <input type="date" id="birthDate" name="birthDate" />
         </div>
-
         <div class="pm-modal-actions">
-          <button type="submit" class="pm-primary">Save</button>
-          <button type="button" id="closeChildModal">Cancel</button>
+          <button type="submit" class="pm-primary">${t("save")}</button>
+          <button type="button" id="closeChildModal">${t("cancel")}</button>
         </div>
       </form>
     </div>
   </div>
-
-  <!-- ADD CHILD BUTTON -->
-  <button id="addChildBtn" class="pm-primary add-child-btn">➕ Add Child</button>
-</div>
-
-`,
-    medicines: `
+  <button id="addChildBtn" class="pm-primary add-child-btn">➕ ${t("add_child")}</button>
+</div>`,
+    medicines: () => `
       <div class="medicine_list">
         <div class="container">
-          <h2>Medicine List</h2>
-
+          <h2>${t("medicine_list")}</h2>
           <div class="tab-content active" data-tab="child-medicines">
             <div class="medicine-child-filter">
-              <label for="medicineChildSelect">Select child</label>
+              <label for="medicineChildSelect">${t("select_child")}</label>
               <select id="medicineChildSelect">
-                <option value="">— Select child —</option>
+                <option value="">— ${t("select_child")} —</option>
               </select>
             </div>
-
             <form id="addMedicineForm">
-              <input type="text" id="medicineName" placeholder="Medicine name" required>
-              <input type="text" id="dosage" placeholder="Dosage" required>
-              <input type="number" id="timesPerDay" placeholder="Times per day" min="1" required>
-              <button type="submit">Add Medicine</button>
+              <input type="text" id="medicineName" placeholder="${t("medicine_name")}" required>
+              <input type="text" id="dosage" placeholder="${t("dosage")}" required>
+              <input type="number" id="timesPerDay" placeholder="${t("times_per_day")}" min="1" required>
+              <button type="submit">${t("add_medicine")}</button>
             </form>
-
             <ul id="medicineList"></ul>
           </div>
         </div>
       </div>
     `,
 
-    checklist: `
+    checklist: () => `
 <div class="dailychecklist">
   <div class="container">
-    <h2>Daily Medicine Checklist</h2>
-
+    <h2>${t("checklist_title")}</h2>
     <div class="medicine-child-filter">
-      <label for="childSelect">Select child</label>
+      <label for="childSelect">${t("select_child")}</label>
       <select id="checklistChildSelect">
-        <option value="">— All children —</option>
+        <option value="">— ${t("select_child")} —</option>
       </select>
     </div>
-
-    <!-- 👇 HINT -->
-    <p id="selectChildHint" class="hint">
-      👶 Please select a child to see the checklist
-    </p>
-
+    <p id="selectChildHint" class="hint">👶 ${t("select_child_hint")}</p>
     <ul id="dailyChecklist"></ul>
-
-    <div id="missedWarning" class="warning hidden">
-      ⚠️ Yesterday you missed your medicines
-    </div>
+    <div id="missedWarning" class="warning hidden">⚠️ ${t("missed_yesterday")}</div>
   </div>
 </div>
 `,
@@ -216,347 +192,297 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     savedarticles: `
 <div class="saved-articles-page">
-  <h2>⭐ Saved Articles</h2>
+  <h2>⭐ ${t("saved_articles_title")}</h2>
   <div id="savedArticlesGrid" class="saved-articles-grid"></div>
 </div>
 `,
 
-    addanalysis: `
+    addanalysis: () => `
   <div class="addanalysis">
     <div class="container">
-
       <div class="header">
-        <h2>Add Medical Analysis</h2>
+        <h2>${t("add_analysis")}</h2>
         <div id="messageBox" style="display:none;"></div>
       </div>
-
       <form id="medicalForm" novalidate>
-
-        <label>Child</label>
+        <label>${t("select_child")}</label>
         <select id="analysisChildSelect">
-          <option value="">Select child</option>
-        </select>
-
-        <label>Analysis Type</label>
+          <option value="">${t("select_child")}</option>
+        </select>        <label>Analysis Type</label>
         <select id="typeSelect">
           <option value="">Select type</option>
           <option value="blood">🩸 Blood (5 credits)</option>
-          <option value="vitamin">💊 Vitamin (4 credits)</option>
+          <option value="vitamin">💊 ${t("vitamin_analysis")}</option>
         </select>
-
         <div id="bloodFields" style="display:none;">
-          <h4>Blood Analysis</h4>
-          <input type="number" id="hemoglobin" placeholder="Hemoglobin (g/dL)" step="0.1" />
-          <input type="number" id="ferritin" name="ferritin" placeholder="Ferritin (ng/mL)" step="0.1" />
+          <h4>${t("blood_analysis")}</h4>
+          <input type="number" id="hemoglobin" placeholder="${t("hemoglobin")}" step="0.1" />
+          <input type="number" id="ferritin" name="ferritin" placeholder="${t("ferritin")}" step="0.1" />
         </div>
-
         <div id="vitaminFields" style="display:none;">
-          <h4>Vitamin Analysis</h4>
-          <input type="number" id="vitaminD" placeholder="Vitamin D (ng/mL)" step="0.1" />
-          <input type="number" id="vitaminB12" placeholder="Vitamin B12 (pg/mL)" step="1" />
+          <h4>${t("vitamin_analysis")}</h4>
+          <input type="number" id="vitaminD" placeholder="${t("vitamin_d")}" step="0.1" />
+          <input type="number" id="vitaminB12" placeholder="${t("vitamin_b12")}" step="1" />
         </div>
-
-        <button type="submit">Save Analysis</button>
+        <button type="submit">${t("save_analysis")}</button>
       </form>
-
-      <!-- AI Analysis Block -->
       <div id="aiAnalysisSection" style="display:none;margin-top:20px;">
         <div class="ai-analysis-card">
           <div class="ai-analysis-header">
             <span>🤖 AI Analysis</span>
             <span id="aiCreditCost" class="ai-credit-badge"></span>
           </div>
-          <p style="font-size:13px;color:#64748b;margin:8px 0 12px;">
-            Get AI-powered interpretation of this analysis result.
-          </p>
-          <button id="runAIAnalysisBtn" class="ai-run-btn">Run AI Analysis</button>
+          <p style="font-size:13px;color:#64748b;margin:8px 0 12px;">${t("run_ai")}</p>
+          <button id="runAIAnalysisBtn" class="ai-run-btn">${t("run_ai")}</button>
         </div>
       </div>
-
       <div id="aiSummaryBlock" style="display:none;margin-top:16px;"></div>
-
     </div>
   </div>
 `,
-    results: `
+    results: () => `
   <div class="results-page">
     <div class="container">
-      <h2>Medical Results History & Trends</h2>
-
+      <h2>${t("results_title")}</h2>
       <div class="filters">
-        <label for="childFilter">Filter by Child:</label>
+        <label for="childFilter">${t("filter_by_child")}:</label>
         <select id="childFilter">
-          <option value="">All Children</option>
+          <option value="">${t("all_children")}</option>
         </select>
-
-        <label for="typeFilter">Filter by Type:</label>
+        <label for="typeFilter">${t("filter_by_type")}:</label>
         <select id="typeFilter">
-          <option value="">All Types</option>
-          <option value="blood">Blood</option>
-          <option value="vitamin">Vitamin</option>
+          <option value="">${t("all_types")}</option>
+          <option value="blood">${t("blood")}</option>
+          <option value="vitamin">${t("vitamin")}</option>
         </select>
       </div>
-
       <div id="messageBox"></div>
-
       <div class="content">
         <div class="results">
-          <h3>Analysis Results</h3>
+          <h3>${t("results_title")}</h3>
           <ul id="resultsList"></ul>
         </div>
-
         <div class="chart">
-          <h3>Trend Chart</h3>
-          <p id="trendHint" class="hint">👶 Please select a child to see the trend</p>
+          <h3>📈 Trend</h3>
+          <p id="trendHint" class="hint">👶 ${t("select_child_hint")}</p>
           <canvas id="trendChart"></canvas>
         </div>
       </div>
-
       <div id="editModal">
-        <h3>Edit Analysis</h3>
+        <h3>${t("edit")}</h3>
         <form id="editForm">
           <div id="editFields"></div>
           <div class="modal-buttons">
-            <button type="submit">Save</button>
-            <button type="button" id="closeEdit">Cancel</button>
+            <button type="submit">${t("save")}</button>
+            <button type="button" id="closeEdit">${t("cancel")}</button>
           </div>
         </form>
       </div>
-
       <div id="overlay"></div>
     </div>
   </div>
 `,
 
     admin: `<div class="admin-page"></div>`,
-
     childhealth: `<div class="child-health-page"></div>`,
-
     family: `<div class="family-page"></div>`,
-
     notifications: `<div class="notifications-page"></div>`,
 
-    motherhealth: `
+    motherhealth: () => `
 <div class="motherhealth-page">
   <div class="mh-header">
-    <h2>👩 Mother Health</h2>
-    <p>Your health, your journey</p>
+    <h2>👩 ${t("mh_title")}</h2>
+    <p>${t("mh_subtitle")}</p>
   </div>
   <div class="mh-nav-cards">
     <div class="mh-nav-card" data-page="pregnancy">
       <span class="mh-icon">🩸</span>
-      <h3>Period Tracker</h3>
-      <p>Track your cycle, predict ovulation and fertile window</p>
+      <h3>${t("period_title")}</h3>
     </div>
     <div class="mh-nav-card" data-page="medicines">
       <span class="mh-icon">💊</span>
-      <h3>My Supplements</h3>
-      <p>Manage your vitamins and supplements</p>
+      <h3>${t("my_supplements")}</h3>
     </div>
   </div>
-
   <div class="mh-cards-grid">
     <div class="mh-card" id="waterIntakeCard">
-      <h3>💧 Daily Water Goal</h3>
-      <label>Daily goal (liters)</label>
-      <input type="number" id="waterLiters" step="0.1" min="0.5" max="5" placeholder="e.g. 2.0" />
+      <h3>💧 ${t("water_goal")}</h3>
+      <label>${t("daily_liters")}</label>
+      <input type="number" id="waterLiters" step="0.1" min="0.5" max="5" placeholder="2.0" />
       <p id="waterGlassesDisplay" class="mh-glasses-display"></p>
-      <label>Start hour (0–23)</label>
-      <input type="number" id="waterStartHour" min="0" max="23" placeholder="e.g. 7" />
-      <label>End hour (0–23)</label>
-      <input type="number" id="waterEndHour" min="0" max="23" placeholder="e.g. 22" />
+      <label>${t("start_hour")}</label>
+      <input type="number" id="waterStartHour" min="0" max="23" placeholder="7" />
+      <label>${t("end_hour")}</label>
+      <input type="number" id="waterEndHour" min="0" max="23" placeholder="22" />
       <p id="waterError" class="mh-error"></p>
-      <button id="saveWaterBtn">Save</button>
+      <button id="saveWaterBtn">${t("save")}</button>
     </div>
-
     <div class="mh-card" id="appointmentCard">
-      <h3>🏥 Next Doctor Appointment</h3>
-      <label>Appointment date</label>
+      <h3>🏥 ${t("next_appointment")}</h3>
+      <label>${t("appointment_date")}</label>
       <input type="date" id="appointmentDate" />
       <p id="appointmentWarning" class="mh-error"></p>
-      <button id="saveAppointmentBtn">Save</button>
+      <button id="saveAppointmentBtn">${t("save")}</button>
     </div>
   </div>
 </div>
 `,
 
-    pregnancy: `
+    pregnancy: () => `
 <div class="pregnancy-page">
   <div class="pregnancy-header">
-    <h2>🩸 Period Tracker</h2>
-    <p>Track your cycle, predict ovulation and fertile window</p>
+    <h2>🩸 ${t("period_title")}</h2>
   </div>
-
-  <!-- Predictions -->
   <div id="periodPredictions" class="period-predictions"></div>
-
-  <!-- Log Form -->
   <div class="period-calendar-section pregnancy-form-container">
-    <h3>📝 Log Period</h3>
+    <h3>📝 ${t("log_period")}</h3>
     <div class="period-inputs">
       <div>
-        <label style="display:block;font-size:13px;color:#64748b;margin-bottom:4px;">Period Start Date</label>
+        <label style="display:block;font-size:13px;color:#64748b;margin-bottom:4px;">${t("period_start")}</label>
         <input type="date" id="lastPeriodDate" />
       </div>
       <div>
-        <label style="display:block;font-size:13px;color:#64748b;margin-bottom:4px;">Period End Date</label>
+        <label style="display:block;font-size:13px;color:#64748b;margin-bottom:4px;">${t("period_end")}</label>
         <input type="date" id="periodEndDate" />
       </div>
       <div>
-        <label style="display:block;font-size:13px;color:#64748b;margin-bottom:4px;">Cycle Length (21–35 days)</label>
+        <label style="display:block;font-size:13px;color:#64748b;margin-bottom:4px;">${t("cycle_length")}</label>
         <input type="number" id="cycleLength" min="21" max="35" value="28" />
       </div>
       <div>
-        <label style="display:block;font-size:13px;color:#64748b;margin-bottom:4px;">Flow Level</label>
+        <label style="display:block;font-size:13px;color:#64748b;margin-bottom:4px;">${t("flow_level")}</label>
         <select id="flowLevel" style="padding:10px 12px;border-radius:10px;border:1px solid #e2e8f0;font-size:14px;width:100%;">
-          <option value="">Select flow</option>
-          <option value="light">🩸 Light</option>
-          <option value="medium">🩸🩸 Medium</option>
-          <option value="heavy">🩸🩸🩸 Heavy</option>
+          <option value="">${t("select_child")}</option>
+          <option value="light">${t("flow_light")}</option>
+          <option value="medium">${t("flow_medium")}</option>
+          <option value="heavy">${t("flow_heavy")}</option>
         </select>
       </div>
       <div style="display:flex;align-items:flex-end;">
-        <button id="savePeriodBtn" class="pm-primary" style="width:100%;">Save</button>
+        <button id="savePeriodBtn" class="pm-primary" style="width:100%;">${t("save")}</button>
       </div>
     </div>
   </div>
-
-  <!-- Calendar -->
   <div class="period-calendar-section">
     <div class="calendar-nav">
-      <button id="calendarPrev">&#8592; Prev</button>
+      <button id="calendarPrev">← ${t("back")}</button>
       <span id="calendarTitle" style="font-weight:600;font-size:16px;color:#1e293b;"></span>
-      <button id="calendarNext">Next &#8594;</button>
+      <button id="calendarNext">${t("next") !== "next" ? t("next") : "Next"} →</button>
     </div>
     <div id="periodCalendarGrid" class="calendar-grid"></div>
     <div id="calendarLegend" class="calendar-legend"></div>
   </div>
-
-  <!-- Symptoms -->
   <div class="period-calendar-section pregnancy-form-container">
-    <h3>🩺 Symptoms & Notes</h3>
-    <textarea id="symptomsTextarea" placeholder="Note your symptoms, mood, or anything else..." rows="3" style="width:100%;padding:10px;border-radius:10px;border:1px solid #e2e8f0;font-size:13px;resize:vertical;box-sizing:border-box;"></textarea>
-    <button id="updateSymptomsBtn" style="margin-top:8px;">Save Notes</button>
+    <h3>🩺 ${t("symptoms_notes")}</h3>
+    <textarea id="symptomsTextarea" placeholder="${t("symptoms_placeholder")}" rows="3" style="width:100%;padding:10px;border-radius:10px;border:1px solid #e2e8f0;font-size:13px;resize:vertical;box-sizing:border-box;"></textarea>
+    <button id="updateSymptomsBtn" style="margin-top:8px;">${t("save_notes")}</button>
   </div>
-
-  <!-- History -->
   <div class="period-calendar-section">
-    <h3>📊 Cycle History</h3>
+    <h3>📊 ${t("cycle_history")}</h3>
     <div id="cycleHistoryList"></div>
   </div>
 </div>
 `,
 
-    billing: `
-<div id="billingPage"></div>
-`,
+    billing: `<div id="billingPage"></div>`,
 
-    vaccination: `
+    vaccination: () => `
 <div class="vaccination-page">
-  <h2>💉 Vaccination Tracker</h2>
+  <h2>💉 ${t("vaccination_title")}</h2>
   <div class="medicine-child-filter">
-    <label>Select child</label>
+    <label>${t("select_child")}</label>
     <select id="vaccinationChildSelect">
-      <option value="">— Select child —</option>
+      <option value="">${t("select_child_placeholder")}</option>
     </select>
   </div>
-  <p id="vaccinationHint" class="hint">👶 Bolani tanlang</p>
+  <p id="vaccinationHint" class="hint">👶 ${t("select_child_hint")}</p>
   <ul id="vaccinationList" style="display:none"></ul>
 </div>
 `,
 
-    settings: `
+    settings: () => `
 <div class="settings-page">
   <div class="settings-header">
-    <h2>⚙️ Settings</h2>
-    <p>Manage your account and preferences</p>
+    <h2>⚙️ ${t("settings_title")}</h2>
+    <p>${t("settings_subtitle")}</p>
   </div>
-
   <div class="settings-section">
-    <h3>👤 Profile Settings</h3>
+    <h3>👤 ${t("profile_settings")}</h3>
     <div class="settings-field">
-      <label>Display Name</label>
-      <input type="text" id="settingsDisplayName" placeholder="Your name" />
+      <label>${t("display_name")}</label>
+      <input type="text" id="settingsDisplayName" placeholder="${t("display_name")}" />
     </div>
     <div class="settings-field">
       <label>Email</label>
-      <input type="email" id="settingsEmail" placeholder="your@email.com" readonly class="readonly-field" />
-      <small style="color:#94a3b8;font-size:12px;">Email cannot be changed here</small>
+      <input type="email" id="settingsEmail" readonly class="readonly-field" />
+      <small style="color:#94a3b8;font-size:12px;">${t("email_readonly")}</small>
     </div>
     <div id="settingsCredits" style="font-size:15px;font-weight:700;color:#2563eb;margin:8px 0;"></div>
-    <button id="saveProfileBtn" class="settings-save-btn">Save Profile</button>
+    <button id="saveProfileBtn" class="settings-save-btn">${t("profile_settings")}</button>
   </div>
-
   <div class="settings-section">
-    <h3>🔒 Change Password</h3>
+    <h3>🔒 ${t("change_password")}</h3>
     <div class="settings-field">
-      <label>Current Password</label>
-      <input type="password" id="currentPassword" placeholder="Current password" />
+      <label>${t("current_password")}</label>
+      <input type="password" id="currentPassword" placeholder="${t("current_password")}" />
     </div>
     <div class="settings-field">
-      <label>New Password</label>
-      <input type="password" id="newPassword" placeholder="New password" />
+      <label>${t("new_password")}</label>
+      <input type="password" id="newPassword" placeholder="${t("new_password")}" />
     </div>
     <div class="settings-field">
-      <label>Confirm New Password</label>
-      <input type="password" id="confirmPassword" placeholder="Confirm new password" />
+      <label>${t("confirm_password")}</label>
+      <input type="password" id="confirmPassword" placeholder="${t("confirm_password")}" />
     </div>
     <p id="passwordError" class="settings-error" style="display:none;"></p>
-    <button id="changePasswordBtn" class="settings-save-btn">Change Password</button>
+    <button id="changePasswordBtn" class="settings-save-btn">${t("change_password")}</button>
   </div>
-
   <div class="settings-section">
-    <h3>🔔 Notifications</h3>
+    <h3>🔔 ${t("notifications_label")}</h3>
     <div class="settings-toggle-row">
-      <span>Enable Notifications</span>
+      <span>${t("notifications_label")}</span>
       <label class="toggle-switch">
         <input type="checkbox" id="notificationsToggle" />
         <span class="toggle-slider"></span>
       </label>
     </div>
   </div>
-
   <div class="settings-section">
-  <h3>📱 Telegram Notifications</h3>
-  <p style="font-size:13px;color:#64748b;">Telegram botdan chat ID olish: @userinfobot ga /start yuboring</p>
-  <div class="settings-field">
-    <label>Telegram Chat ID</label>
-    <input type="text" id="telegramChatId" placeholder="-100xxxxxxxxx yoki 123456789" />
-    <p id="telegramChatIdError" class="settings-error" style="display:none;">
-      Noto'g'ri format. Faqat raqamlar (ixtiyoriy minus bilan).
-    </p>
-  </div>
-  <button id="saveTelegramBtn" class="settings-save-btn">Saqlash</button>
-</div>
-
-  <div class="settings-section">
-    <h3>🎨 App Preferences</h3>
+    <h3>📱 ${t("telegram_notifications")}</h3>
+    <p style="font-size:13px;color:#64748b;">${t("telegram_hint")}</p>
     <div class="settings-field">
-      <label>Language</label>
+      <label>${t("telegram_chat_id")}</label>
+      <input type="text" id="telegramChatId" placeholder="-100xxxxxxxxx" />
+      <p id="telegramChatIdError" class="settings-error" style="display:none;">${t("telegram_invalid")}</p>
+    </div>
+    <button id="saveTelegramBtn" class="settings-save-btn">${t("save")}</button>
+  </div>
+  <div class="settings-section">
+    <h3>🎨 ${t("app_preferences")}</h3>
+    <div class="settings-field">
+      <label>${t("language")}</label>
       <select id="languageSelect">
-        <option value="en">English</option>
+        <option value="en">🇬🇧 English</option>
+        <option value="uz">🇺🇿 O'zbek</option>
       </select>
     </div>
     <div class="settings-toggle-row">
-      <span>Dark Mode</span>
+      <span>${t("dark_mode")}</span>
       <label class="toggle-switch">
         <input type="checkbox" id="darkModeToggle" />
         <span class="toggle-slider"></span>
       </label>
     </div>
   </div>
-
   <div class="settings-section danger-zone">
-    <h3>⚠️ Danger Zone</h3>
-    <p style="color:#64748b;font-size:14px;margin-bottom:16px;">Permanently delete your account and all associated data.</p>
-    <button id="deleteAccountBtn" class="settings-danger-btn">Delete Account</button>
+    <h3>⚠️ ${t("danger_zone")}</h3>
+    <p style="color:#64748b;font-size:14px;margin-bottom:16px;">${t("delete_account_desc")}</p>
+    <button id="deleteAccountBtn" class="settings-danger-btn">${t("delete_account")}</button>
   </div>
-
   <div class="settings-section">
-    <h3>🪙 Kredit tarixi</h3>
+    <h3>🪙 ${t("credit_history")}</h3>
     <div id="creditHistoryList"></div>
   </div>
-
   <div id="settingsMessage" class="settings-message" style="display:none;"></div>
 </div>
 `,
@@ -572,9 +498,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const urlParams = new URLSearchParams(window.location.search);
   const paymentStatus = urlParams.get("payment");
   if (paymentStatus === "success") {
-    // Clean URL
     window.history.replaceState({}, "", window.location.pathname);
-    // Navigate to billing page to show updated balance
     setTimeout(() => {
       const billingItem = dashboard.querySelector(
         '.menu-item[data-page="billing"]',
@@ -584,7 +508,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   } else if (paymentStatus === "cancelled") {
     window.history.replaceState({}, "", window.location.pathname);
     import("./toast.js").then(({ toast }) =>
-      toast("To'lov bekor qilindi", "info"),
+      toast(t("payment_cancelled"), "info"),
     );
   }
 

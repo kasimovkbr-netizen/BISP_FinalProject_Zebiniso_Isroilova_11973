@@ -1,6 +1,6 @@
 // motherhealth.module.js
-// Requirements: 5.9
 import { supabase } from "./supabase.js";
+import { t } from "./i18n.js";
 
 /* ── Navigation cards ─────────────────────────────────────────────────────── */
 function initNavCards() {
@@ -48,7 +48,7 @@ async function initWaterIntakeCard(userId) {
       startInput.value = data.start_hour ?? "";
       endInput.value = data.end_hour ?? "";
       if (data.daily_liters) {
-        glassesDisplay.textContent = `≈ ${calculateGlasses(data.daily_liters)} glasses per day`;
+        glassesDisplay.textContent = `≈ ${calculateGlasses(data.daily_liters)} ${t("glasses_per_day") !== "glasses_per_day" ? t("glasses_per_day") : "glasses per day"}`;
       }
     }
   } catch (e) {
@@ -59,7 +59,7 @@ async function initWaterIntakeCard(userId) {
   litersInput.addEventListener("input", () => {
     const val = parseFloat(litersInput.value);
     if (!isNaN(val) && val > 0) {
-      glassesDisplay.textContent = `≈ ${calculateGlasses(val)} glasses per day`;
+      glassesDisplay.textContent = `≈ ${calculateGlasses(val)} ${t("glasses_per_day") !== "glasses_per_day" ? t("glasses_per_day") : "glasses per day"}`;
     } else {
       glassesDisplay.textContent = "";
     }
@@ -84,18 +84,16 @@ async function initWaterIntakeCard(userId) {
     errorEl.style.display = "none";
 
     try {
-      const { error } = await supabase
-        .from("water_intake")
-        .upsert(
-          {
-            user_id: userId,
-            daily_liters,
-            start_hour,
-            end_hour,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" },
-        );
+      const { error } = await supabase.from("water_intake").upsert(
+        {
+          user_id: userId,
+          daily_liters,
+          start_hour,
+          end_hour,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      );
 
       if (error) throw error;
       saveBtn.textContent = "✅ Saved";
@@ -155,16 +153,14 @@ async function initAppointmentCard(userId) {
     }
 
     try {
-      const { error } = await supabase
-        .from("appointments")
-        .upsert(
-          {
-            user_id: userId,
-            appointment_date,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" },
-        );
+      const { error } = await supabase.from("appointments").upsert(
+        {
+          user_id: userId,
+          appointment_date,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      );
 
       if (error) throw error;
       saveBtn.textContent = "✅ Saved";

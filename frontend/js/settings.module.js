@@ -290,6 +290,16 @@ function setupEventListeners() {
     };
   }
 
+  // Language select
+  const langSelect = document.getElementById("languageSelect");
+  if (langSelect) {
+    const { getLang, setLang } = await import("./i18n.js");
+    langSelect.value = getLang();
+    langSelect.onchange = () => {
+      setLang(langSelect.value);
+    };
+  }
+
   // Notifications
   const notifToggle = document.getElementById("notificationsToggle");
   if (notifToggle) {

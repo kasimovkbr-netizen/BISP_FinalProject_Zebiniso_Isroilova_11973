@@ -1,6 +1,7 @@
 // billing.module.js — Stripe Checkout Integration
 import { supabase } from "./supabase.js";
 import { toast } from "./toast.js";
+import { t } from "./i18n.js";
 
 const API_BASE = (window.__API_BASE_URL__ || "http://localhost:3001") + "/api";
 
@@ -35,14 +36,20 @@ const PACKAGES = [
 const TIERS = [
   {
     id: "monthly_500",
-    name: "Monthly Plan",
+    name: () => t("monthly_plan"),
     price: "$14.99/mo",
     credits: 500,
-    features: [
-      "500 kredit/oy",
-      "Har oy yangilanadi",
-      "Barcha tahlil turlari",
-      "Telegram eslatmalar",
+    features: () => [
+      `500 ${t("credits")}/${t("month_short") !== "month_short" ? t("month_short") : "oy"}`,
+      t("renews_monthly") !== "renews_monthly"
+        ? t("renews_monthly")
+        : "Har oy yangilanadi",
+      t("all_analysis_types") !== "all_analysis_types"
+        ? t("all_analysis_types")
+        : "Barcha tahlil turlari",
+      t("telegram_reminders") !== "telegram_reminders"
+        ? t("telegram_reminders")
+        : "Telegram eslatmalar",
     ],
     color: "#7c3aed",
     popular: true,
@@ -123,89 +130,81 @@ async function renderBilling() {
 function buildHTML(credits, freeRemaining, freePercent, freeUsed, freeLimit) {
   return `
 <div class="bl-page">
-
-  <!-- Header Stats -->
   <div class="bl-header">
     <div class="bl-header-left">
-      <div class="bl-header-title">💳 To'lov va Kreditlar</div>
-      <div class="bl-header-sub">AI tahlil uchun kreditlar sotib oling</div>
+      <div class="bl-header-title">💳 ${t("billing_title")}</div>
+      <div class="bl-header-sub">${t("billing_subtitle")}</div>
     </div>
     <div class="bl-balance-card">
       <div class="bl-balance-icon">🪙</div>
       <div>
         <div class="bl-balance-num">${credits}</div>
-        <div class="bl-balance-label">Mavjud kredit</div>
+        <div class="bl-balance-label">${t("available_credits")}</div>
       </div>
     </div>
   </div>
-
-  <!-- Free tier progress -->
   <div class="bl-free-card">
     <div class="bl-free-top">
-      <span class="bl-free-title">🎁 Bepul kredit</span>
-      <span class="bl-free-count">${freeRemaining}/${freeLimit} qoldi</span>
+      <span class="bl-free-title">🎁 ${t("free_credits")}</span>
+      <span class="bl-free-count">${freeRemaining}/${freeLimit} ${t("remaining") !== "remaining" ? t("remaining") : "qoldi"}</span>
     </div>
     <div class="bl-progress-bar">
       <div class="bl-progress-fill ${freePercent >= 80 ? "bl-progress-warn" : ""}" style="width:${freePercent}%"></div>
     </div>
-    <div class="bl-free-note">Har oy ${freeLimit} ta bepul kredit beriladi</div>
+    <div class="bl-free-note">${t("free_credits_note")}</div>
   </div>
-
-  <!-- Tabs -->
   <div class="bl-tabs">
-    <button class="bl-tab active" data-tab="credits">⚡ Kredit sotib olish</button>
-    <button class="bl-tab" data-tab="subscription">📅 Obuna</button>
+    <button class="bl-tab active" data-tab="credits">${t("buy_credits_tab")}</button>
+    <button class="bl-tab" data-tab="subscription">${t("subscription_tab")}</button>
   </div>
-
-  <!-- Credits Tab -->
   <div class="bl-tab-content active" data-tab="credits">
-    <p class="bl-desc">Bir martalik to'lov — muddatsiz kredit</p>
+    <p class="bl-desc">${t("one_time_payment")}</p>
     <div class="bl-packages">
       ${PACKAGES.map(
         (pkg) => `
         <div class="bl-pkg ${pkg.popular ? "bl-pkg-popular" : ""}" style="--pkg-color:${pkg.color}">
-          ${pkg.popular ? '<div class="bl-pkg-badge">🔥 Eng mashhur</div>' : ""}
+          ${pkg.popular ? `<div class="bl-pkg-badge">${t("most_popular")}</div>` : ""}
           <div class="bl-pkg-emoji">${pkg.emoji}</div>
           <div class="bl-pkg-name">${pkg.name}</div>
-          <div class="bl-pkg-credits">${pkg.credits}<span>kredit</span></div>
+          <div class="bl-pkg-credits">${pkg.credits}<span>${t("credits")}</span></div>
           <div class="bl-pkg-price">${pkg.price}</div>
-          <div class="bl-pkg-per">${((parseFloat(pkg.price.replace("$", "")) / pkg.credits) * 100).toFixed(1)}¢ / kredit</div>
+          <div class="bl-pkg-per">${((parseFloat(pkg.price.replace("$", "")) / pkg.credits) * 100).toFixed(1)}¢ / ${t("credits")}</div>
           <button class="bl-buy-btn" data-pkg="${pkg.id}" data-credits="${pkg.credits}" data-name="${pkg.name}" data-price="${pkg.price}">
-            Sotib olish
+            ${t("buy_btn")}
           </button>
         </div>
       `,
       ).join("")}
     </div>
     <div class="bl-info-row">
-      <span>🩸 Qon tahlili = 5 kredit</span>
-      <span>💊 Vitamin tahlili = 4 kredit</span>
+      <span>${t("blood_cost")}</span>
+      <span>${t("vitamin_cost")}</span>
     </div>
   </div>
-
-  <!-- Subscription Tab -->
   <div class="bl-tab-content" data-tab="subscription">
-    <p class="bl-desc">Oylik obuna — har oy kredit yangilanadi</p>
+    <p class="bl-desc">${t("subscription_tab")}</p>
     <div class="bl-tiers">
-      ${TIERS.map(
-        (tier) => `
+      ${TIERS.map((tier) => {
+        const features =
+          typeof tier.features === "function" ? tier.features() : tier.features;
+        const name = typeof tier.name === "function" ? tier.name() : tier.name;
+        return `
         <div class="bl-tier" style="--tier-color:${tier.color}">
-          ${tier.popular ? '<div class="bl-tier-badge">⭐ Tavsiya etiladi</div>' : ""}
-          <div class="bl-tier-name">${tier.name}</div>
+          ${tier.popular ? `<div class="bl-tier-badge">${t("recommended")}</div>` : ""}
+          <div class="bl-tier-name">${name}</div>
           <div class="bl-tier-price">${tier.price}</div>
-          <div class="bl-tier-credits">${tier.credits} kredit/oy</div>
+          <div class="bl-tier-credits">${tier.credits} ${t("credits")}/oy</div>
           <ul class="bl-tier-features">
-            ${tier.features.map((f) => `<li>✓ ${f}</li>`).join("")}
+            ${features.map((f) => `<li>✓ ${f}</li>`).join("")}
           </ul>
-          <button class="bl-sub-btn" data-tier="${tier.id}" data-credits="${tier.credits}" data-name="${tier.name}">
-            Obuna bo'lish
+          <button class="bl-sub-btn" data-tier="${tier.id}" data-credits="${tier.credits}" data-name="${name}">
+            ${t("subscribe_btn")}
           </button>
         </div>
-      `,
-      ).join("")}
+      `;
+      }).join("")}
     </div>
   </div>
-
 </div>`;
 }
 
@@ -232,15 +231,21 @@ function attachEvents(container) {
   container.querySelectorAll(".bl-buy-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       showConfirmModal({
-        title: "Kredit sotib olish",
+        title: t("confirm_purchase"),
         emoji: "🪙",
         rows: [
-          ["Paket", btn.dataset.name],
-          ["Kredit", btn.dataset.credits],
-          ["Narx", btn.dataset.price],
+          [
+            t("package") !== "package" ? t("package") : "Paket",
+            btn.dataset.name,
+          ],
+          [t("credits"), btn.dataset.credits],
+          [t("price") !== "price" ? t("price") : "Narx", btn.dataset.price],
         ],
-        note: "Stripe to'lov sahifasiga yo'naltirilasiz",
-        confirmText: "💳 Stripe bilan to'lash",
+        note:
+          t("stripe_redirect") !== "stripe_redirect"
+            ? t("stripe_redirect")
+            : "Stripe to'lov sahifasiga yo'naltirilasiz",
+        confirmText: t("pay_stripe"),
         onConfirm: async () => {
           await handleBuyStripe(
             btn.dataset.pkg,
@@ -256,14 +261,17 @@ function attachEvents(container) {
   container.querySelectorAll(".bl-sub-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       showConfirmModal({
-        title: "Obuna bo'lish",
+        title: t("subscribe_btn"),
         emoji: "📅",
         rows: [
-          ["Reja", btn.dataset.name],
-          ["Kredit", `${btn.dataset.credits}/oy`],
+          [t("plan") !== "plan" ? t("plan") : "Reja", btn.dataset.name],
+          [t("credits"), `${btn.dataset.credits}/oy`],
         ],
-        note: "Stripe to'lov sahifasiga yo'naltirilasiz",
-        confirmText: "💳 Obuna bo'lish",
+        note:
+          t("stripe_redirect") !== "stripe_redirect"
+            ? t("stripe_redirect")
+            : "Stripe to'lov sahifasiga yo'naltirilasiz",
+        confirmText: t("pay_stripe"),
         onConfirm: async () => {
           await handleSubscribeStripe(btn.dataset.tier, btn.dataset.name);
         },
@@ -361,7 +369,7 @@ function showConfirmModal({
       ${note ? `<div class="bl-modal-note">ℹ️ ${note}</div>` : ""}
       <div class="bl-modal-actions">
         <button class="bl-modal-confirm" id="blConfirm">${confirmText}</button>
-        <button class="bl-modal-cancel" id="blCancel">Bekor qilish</button>
+        <button class="bl-modal-cancel" id="blCancel">${t("cancel")}</button>
       </div>
     </div>
   `;

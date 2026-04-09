@@ -1,7 +1,7 @@
 // notifications.module.js
-// Tables: notifications, app_feedback
 import { supabase } from "./supabase.js";
 import { toast } from "./toast.js";
+import { t } from "./i18n.js";
 
 let userId = null;
 let channel = null;
@@ -30,36 +30,36 @@ function renderShell() {
   if (!page) return;
   page.innerHTML = `
     <div class="adm-header">
-      <div class="adm-title">🔔 Bildirishnomalar</div>
+      <div class="adm-title">🔔 ${t("notifications_title")}</div>
       <div style="display:flex;gap:8px;">
-        <button class="adm-btn-primary" id="markAllRead">✅ Hammasini o'qildi</button>
+        <button class="adm-btn-primary" id="markAllRead">${t("mark_all_read")}</button>
       </div>
     </div>
     <div id="notifList"></div>
     <div class="adm-section" style="margin-top:24px;">
-      <div class="adm-section-title">💬 Fikr-mulohaza yuborish</div>
+      <div class="adm-section-title">💬 ${t("send_feedback")}</div>
       <form id="feedbackForm" class="ch-form">
         <div class="ch-form-grid">
-          <div><label>Reyting</label>
+          <div><label>${t("rating")}</label>
             <select id="fbRating">
-              <option value="5">⭐⭐⭐⭐⭐ Ajoyib</option>
-              <option value="4">⭐⭐⭐⭐ Yaxshi</option>
-              <option value="3">⭐⭐⭐ O'rtacha</option>
-              <option value="2">⭐⭐ Yomon</option>
-              <option value="1">⭐ Juda yomon</option>
+              <option value="5">${t("excellent")}</option>
+              <option value="4">${t("good_rating")}</option>
+              <option value="3">${t("average_rating")}</option>
+              <option value="2">${t("poor_rating")}</option>
+              <option value="1">${t("very_poor_rating")}</option>
             </select>
           </div>
-          <div><label>Kategoriya</label>
+          <div><label>${t("category")}</label>
             <select id="fbCategory">
-              <option value="general">Umumiy</option>
-              <option value="bug">Xato</option>
-              <option value="feature">Taklif</option>
-              <option value="design">Dizayn</option>
+              <option value="general">${t("general")}</option>
+              <option value="bug">${t("bug")}</option>
+              <option value="feature">${t("feature")}</option>
+              <option value="design">${t("design")}</option>
             </select>
           </div>
         </div>
-        <textarea id="fbMessage" placeholder="Fikringizni yozing..." rows="3"></textarea>
-        <button type="submit" class="adm-btn-primary">📤 Yuborish</button>
+        <textarea id="fbMessage" placeholder="${t("write_feedback")}" rows="3"></textarea>
+        <button type="submit" class="adm-btn-primary">📤 ${t("send")}</button>
       </form>
     </div>
   `;
@@ -81,7 +81,7 @@ async function loadNotifications() {
     .order("created_at", { ascending: false })
     .limit(50);
   if (!data?.length) {
-    el.innerHTML = `<div class="adm-empty">Bildirishnoma yo'q</div>`;
+    el.innerHTML = `<div class="adm-empty">${t("no_notifications")}</div>`;
     return;
   }
   el.innerHTML = data
@@ -94,7 +94,7 @@ async function loadNotifications() {
         <div class="notif-msg">${n.message || ""}</div>
         <div class="notif-time">${new Date(n.created_at).toLocaleString("uz-UZ")}</div>
       </div>
-      ${!n.read ? `<button class="adm-btn-sm blue notif-read-btn" data-id="${n.id}">O'qildi</button>` : ""}
+      ${!n.read ? `<button class="adm-btn-sm blue notif-read-btn" data-id="${n.id}">${t("read") !== "read" ? t("read") : "O'qildi"}</button>` : ""}
     </div>
   `,
     )
@@ -128,7 +128,7 @@ async function markAllRead() {
     .update({ read: true })
     .eq("user_id", userId)
     .eq("read", false);
-  toast("✅ Hammasi o'qildi", "success");
+  toast(`✅ ${t("mark_all_read")}`, "success");
   await loadNotifications();
 }
 
@@ -144,7 +144,7 @@ async function submitFeedback(e) {
     toast("Xato: " + error.message, "error");
     return;
   }
-  toast("✅ Fikringiz yuborildi, rahmat!", "success");
+  toast(`✅ ${t("feedback_sent")}`, "success");
   document.getElementById("feedbackForm").reset();
 }
 

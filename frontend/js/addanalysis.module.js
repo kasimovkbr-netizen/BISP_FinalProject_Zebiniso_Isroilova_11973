@@ -1,6 +1,6 @@
 // addanalysis.module.js
-// Requirements: 5.10, 11.4
 import { supabase } from "./supabase.js";
+import { t } from "./i18n.js";
 
 let userId = null;
 let realtimeChannel = null;
@@ -134,11 +134,11 @@ function setupUI() {
       return;
     }
     if (!childSelect.value) {
-      showMessage("Please select a child", "error");
+      showMessage(t("select_child_first"), "error");
       return;
     }
     if (!typeSelect.value) {
-      showMessage("Please select analysis type", "error");
+      showMessage(t("select_type_first"), "error");
       return;
     }
 
@@ -149,7 +149,7 @@ function setupUI() {
       const hemoglobin = document.getElementById("hemoglobin")?.value;
       const ferritin = document.getElementById("ferritin")?.value;
       if (!hemoglobin || !ferritin) {
-        showMessage("Please fill all blood fields", "error");
+        showMessage(t("fill_blood_fields"), "error");
         return;
       }
 

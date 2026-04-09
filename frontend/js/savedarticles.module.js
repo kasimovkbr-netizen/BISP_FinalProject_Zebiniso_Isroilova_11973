@@ -1,4 +1,5 @@
 import { supabase } from "./supabase.js";
+import { t } from "./i18n.js";
 
 let savedArticles = [];
 
@@ -13,7 +14,7 @@ export async function initSavedArticlesModule() {
 
   const userId = session.user.id;
 
-  grid.innerHTML = `<div class="saved-article-card"><p>Loading...</p></div>`;
+  grid.innerHTML = `<div class="saved-article-card"><p>${t("loading")}</p></div>`;
 
   const { data, error } = await supabase
     .from("saved_articles")
@@ -44,7 +45,7 @@ export function renderSavedArticles(articles) {
   if (!articles || articles.length === 0) {
     grid.innerHTML = `
       <div class="saved-article-card saved-articles-empty">
-        <p>No saved articles yet. Browse the Knowledge Base to save articles.</p>
+        <p>${t("no_saved_articles")}</p>
       </div>
     `;
     return;
@@ -58,7 +59,7 @@ export function renderSavedArticles(articles) {
       <p class="card-summary">${article.summary || ""}</p>
       <div class="card-footer">
         <span class="article-badge ${getCategoryBadgeClass(article.category)}">${article.category || ""}</span>
-        <button class="read-article-btn" data-id="${article.id}">Read →</button>
+        <button class="read-article-btn" data-id="${article.id}">${t("read") !== "read" ? t("read") : "Read"} →</button>
       </div>
     </div>
   `,
@@ -182,8 +183,7 @@ function openArticleDetail(article) {
           background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;
           border:none;border-radius:12px;padding:10px 24px;
           font-size:14px;font-weight:600;cursor:pointer;
-          transition:transform 0.15s,box-shadow 0.15s;
-        ">Close</button>
+        ">${t("close")}</button>
       </div>
     </div>
     <style>
