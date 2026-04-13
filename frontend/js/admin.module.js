@@ -105,16 +105,10 @@ async function loadDashboardStats() {
 
   const [
     { count: usersCount },
-    { count: childrenCount },
-    { count: analysesCount },
     { count: articlesCount },
     { data: recentUsers },
   ] = await Promise.all([
     supabase.from("users").select("*", { count: "exact", head: true }),
-    supabase.from("children").select("*", { count: "exact", head: true }),
-    supabase
-      .from("medical_analyses")
-      .select("*", { count: "exact", head: true }),
     supabase.from("knowledge_base").select("*", { count: "exact", head: true }),
     supabase
       .from("users")
@@ -128,30 +122,20 @@ async function loadDashboardStats() {
       <div class="adm-stat-card" style="--c:#3b82f6">
         <div class="adm-stat-icon">👥</div>
         <div class="adm-stat-num">${usersCount || 0}</div>
-        <div class="adm-stat-label">Foydalanuvchilar</div>
-      </div>
-      <div class="adm-stat-card" style="--c:#8b5cf6">
-        <div class="adm-stat-icon">👶</div>
-        <div class="adm-stat-num">${childrenCount || 0}</div>
-        <div class="adm-stat-label">Bolalar</div>
-      </div>
-      <div class="adm-stat-card" style="--c:#059669">
-        <div class="adm-stat-icon">🧪</div>
-        <div class="adm-stat-num">${analysesCount || 0}</div>
-        <div class="adm-stat-label">Tahlillar</div>
+        <div class="adm-stat-label">Users</div>
       </div>
       <div class="adm-stat-card" style="--c:#f59e0b">
         <div class="adm-stat-icon">📚</div>
         <div class="adm-stat-num">${articlesCount || 0}</div>
-        <div class="adm-stat-label">Maqolalar</div>
+        <div class="adm-stat-label">Articles</div>
       </div>
     </div>
 
     <div class="adm-section">
-      <div class="adm-section-title">🕐 So'nggi foydalanuvchilar</div>
+      <div class="adm-section-title">🕐 Recent Users</div>
       <div class="adm-table-wrap">
         <table class="adm-table">
-          <thead><tr><th>Email</th><th>Ism</th><th>Kredit</th><th>Rol</th><th>Sana</th></tr></thead>
+          <thead><tr><th>Email</th><th>Name</th><th>Credits</th><th>Role</th><th>Date</th></tr></thead>
           <tbody>
             ${(recentUsers || [])
               .map(
@@ -161,7 +145,7 @@ async function loadDashboardStats() {
                 <td>${esc(u.display_name || "—")}</td>
                 <td><span class="adm-badge blue">${u.credits || 0}</span></td>
                 <td><span class="adm-badge ${u.role === "admin" ? "red" : "gray"}">${u.role}</span></td>
-                <td>${new Date(u.created_at).toLocaleDateString("uz-UZ")}</td>
+                <td>${new Date(u.created_at).toLocaleDateString("en-US")}</td>
               </tr>
             `,
               )
@@ -189,9 +173,9 @@ async function loadUsers() {
 
   content.innerHTML = `
     <div class="adm-toolbar">
-      <input class="adm-search" id="userSearch" placeholder="🔍 Email yoki ism bo'yicha qidirish..." />
+      <input class="adm-search" id="userSearch" placeholder="🔍 Search by email or name..." />
       <select class="adm-select" id="roleFilter">
-        <option value="">Barcha rollar</option>
+        <option value="">All roles</option>
         <option value="parent">Parent</option>
         <option value="admin">Admin</option>
       </select>
@@ -227,7 +211,7 @@ function renderUsersTable(users) {
   if (!wrap) return;
 
   if (!users.length) {
-    wrap.innerHTML = `<div class="adm-empty">Foydalanuvchi topilmadi</div>`;
+    wrap.innerHTML = `<div class="adm-empty">No users found</div>`;
     return;
   }
 
@@ -236,8 +220,8 @@ function renderUsersTable(users) {
       <table class="adm-table">
         <thead>
           <tr>
-            <th>Email</th><th>Ism</th><th>Rol</th>
-            <th>Kredit</th><th>Telegram</th><th>Sana</th><th>Amallar</th>
+            <th>Email</th><th>Name</th><th>Role</th>
+            <th>Credits</th><th>Telegram</th><th>Date</th><th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -250,12 +234,9 @@ function renderUsersTable(users) {
               <td><span class="adm-badge ${u.role === "admin" ? "red" : "gray"}">${u.role}</span></td>
               <td><span class="adm-badge blue">${u.credits || 0}</span></td>
               <td>${u.telegram_chat_id ? `<span class="adm-badge green">✓ ${u.telegram_chat_id}</span>` : '<span class="adm-badge gray">—</span>'}</td>
-              <td>${new Date(u.created_at).toLocaleDateString("uz-UZ")}</td>
+              <td>${new Date(u.created_at).toLocaleDateString("en-US")}</td>
               <td class="adm-actions">
-                <button class="adm-btn-sm blue" onclick="window.__adminAddCredits('${u.id}','${esc(u.email)}')">+Kredit</button>
-                <button class="adm-btn-sm ${u.role === "admin" ? "gray" : "purple"}" onclick="window.__adminToggleRole('${u.id}','${u.role}')">
-                  ${u.role === "admin" ? "Parent qil" : "Admin qil"}
-                </button>
+                <button class="adm-btn-sm blue" onclick="window.__adminAddCredits('${u.id}','${esc(u.email)}')">+Credits</button>
               </td>
             </tr>
           `,
@@ -267,11 +248,10 @@ function renderUsersTable(users) {
   `;
 
   window.__adminAddCredits = (id, email) => showAddCreditsModal(id, email);
-  window.__adminToggleRole = (id, role) => toggleUserRole(id, role);
 }
 
 async function showAddCreditsModal(userId, email) {
-  const amount = prompt(`${email} ga necha kredit qo'shish?`, "50");
+  const amount = prompt(`How many credits to add to ${email}?`, "50");
   if (!amount || isNaN(amount) || parseInt(amount) <= 0) return;
 
   const { data: user } = await supabase
@@ -286,14 +266,11 @@ async function showAddCreditsModal(userId, email) {
     .update({ credits: newCredits })
     .eq("id", userId);
   if (error) {
-    toast("Xato: " + error.message, "error");
+    toast("Error: " + error.message, "error");
     return;
   }
 
-  toast(
-    `✅ ${amount} kredit qo'shildi. Yangi balans: ${newCredits}`,
-    "success",
-  );
+  toast(`✅ ${amount} credits added. New balance: ${newCredits}`, "success");
   await loadUsers();
 }
 
@@ -371,10 +348,10 @@ async function loadCreditsTab() {
   content.innerHTML = `
     <div class="adm-credits-grid">
       <div class="adm-section">
-        <div class="adm-section-title">🏆 Eng ko'p kreditli foydalanuvchilar</div>
+        <div class="adm-section-title">🏆 Top Users by Credits</div>
         <div class="adm-table-wrap">
           <table class="adm-table">
-            <thead><tr><th>Email</th><th>Ism</th><th>Kredit</th></tr></thead>
+            <thead><tr><th>Email</th><th>Name</th><th>Credits</th></tr></thead>
             <tbody>
               ${(topUsers || [])
                 .map(
@@ -393,20 +370,20 @@ async function loadCreditsTab() {
       </div>
 
       <div class="adm-section">
-        <div class="adm-section-title">⚠️ Kreditlari tugagan (${zeroUsers?.length || 0} ta)</div>
+        <div class="adm-section-title">⚠️ Users with Zero Credits (${zeroUsers?.length || 0})</div>
         <button class="adm-btn-primary" id="giveAllCreditsBtn" style="margin-bottom:12px;">
-          🎁 Hammaga 10 kredit berish
+          🎁 Give 10 credits to all
         </button>
         <div class="adm-table-wrap">
           <table class="adm-table">
-            <thead><tr><th>Email</th><th>Amal</th></tr></thead>
+            <thead><tr><th>Email</th><th>Action</th></tr></thead>
             <tbody>
               ${(zeroUsers || [])
                 .map(
                   (u) => `
                 <tr>
                   <td>${esc(u.email)}</td>
-                  <td><button class="adm-btn-sm blue" onclick="window.__adminAddCredits('${u.id}','${esc(u.email)}')">+Kredit</button></td>
+                  <td><button class="adm-btn-sm blue" onclick="window.__adminAddCredits('${u.id}','${esc(u.email)}')">+Credits</button></td>
                 </tr>
               `,
                 )
@@ -423,15 +400,11 @@ async function loadCreditsTab() {
   document
     .getElementById("giveAllCreditsBtn")
     ?.addEventListener("click", async () => {
-      if (!confirm(`${zeroUsers?.length} ta foydalanuvchiga 10 kredit berish?`))
-        return;
+      if (!confirm(`Give 10 credits to ${zeroUsers?.length} users?`)) return;
       for (const u of zeroUsers || []) {
         await supabase.from("users").update({ credits: 10 }).eq("id", u.id);
       }
-      toast(
-        `✅ ${zeroUsers?.length} ta foydalanuvchiga 10 kredit berildi`,
-        "success",
-      );
+      toast(`✅ 10 credits given to ${zeroUsers?.length} users`, "success");
       await loadCreditsTab();
     });
 }
@@ -448,16 +421,16 @@ async function loadFeedback() {
     .limit(50);
 
   if (!tickets?.length) {
-    content.innerHTML = `<div class="adm-empty">Hali fikr-mulohazalar yo'q</div>`;
+    content.innerHTML = `<div class="adm-empty">No feedback yet</div>`;
     return;
   }
 
   content.innerHTML = `
     <div class="adm-section">
-      <div class="adm-section-title">💬 Qo'llab-quvvatlash so'rovlari (${tickets.length})</div>
+      <div class="adm-section-title">💬 Support Tickets (${tickets.length})</div>
       <div class="adm-table-wrap">
         <table class="adm-table">
-          <thead><tr><th>Foydalanuvchi</th><th>Mavzu</th><th>Holat</th><th>Sana</th></tr></thead>
+          <thead><tr><th>User</th><th>Subject</th><th>Status</th><th>Date</th></tr></thead>
           <tbody>
             ${tickets
               .map(
@@ -466,7 +439,7 @@ async function loadFeedback() {
                 <td>${esc(t.users?.email || "—")}</td>
                 <td>${esc(t.subject)}</td>
                 <td><span class="adm-badge ${t.status === "open" ? "red" : "green"}">${t.status}</span></td>
-                <td>${new Date(t.created_at).toLocaleDateString("uz-UZ")}</td>
+                <td>${new Date(t.created_at).toLocaleDateString("en-US")}</td>
               </tr>
             `,
               )

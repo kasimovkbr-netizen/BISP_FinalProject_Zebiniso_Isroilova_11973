@@ -287,7 +287,10 @@ async function handleBuyStripe(packageId, name, credits) {
     }
   } catch (e) {
     console.error("[billing] fetch error:", e);
-    toast("❌ Could not connect to server.", "error");
+    toast(
+      "❌ Backend server is not running. Please deploy the backend first.",
+      "error",
+    );
   }
 }
 
@@ -311,7 +314,10 @@ async function handleSubscribeStripe(tierId, name) {
     }
   } catch (e) {
     console.error("[billing] fetch error:", e);
-    toast("❌ Could not connect to server.", "error");
+    toast(
+      "❌ Backend server is not running. Please deploy the backend first.",
+      "error",
+    );
   }
 }
 

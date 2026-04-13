@@ -372,11 +372,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     <div id="periodCalendarGrid" class="calendar-grid"></div>
     <div id="calendarLegend" class="calendar-legend"></div>
   </div>
-  <div class="period-calendar-section pregnancy-form-container">
-    <h3>🩺 ${t("symptoms_notes")}</h3>
-    <textarea id="symptomsTextarea" placeholder="${t("symptoms_placeholder")}" rows="3" style="width:100%;padding:10px;border-radius:10px;border:1px solid #e2e8f0;font-size:13px;resize:vertical;box-sizing:border-box;"></textarea>
-    <button id="updateSymptomsBtn" style="margin-top:8px;">${t("save_notes")}</button>
-  </div>
   <div class="period-calendar-section">
     <h3>📊 ${t("cycle_history")}</h3>
     <div id="cycleHistoryList"></div>
