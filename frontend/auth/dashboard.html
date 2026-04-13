@@ -1,131 +1,183 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>PediaMom | Dashboard</title>
-  <link rel="stylesheet" href="../css/style.css">
-</head>
-<body class="dashboard-page">
+  <head>
+    <meta charset="UTF-8" />
+    <title>PediaMom | Dashboard</title>
+    <link rel="stylesheet" href="../css/style.css" />
+  </head>
+  <body class="dashboard-page">
+    <!-- Mobile hamburger -->
+    <button class="sidebar-toggle" id="sidebarToggle" aria-label="Menu">
+      ☰
+    </button>
+    <!-- Sidebar overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-  <!-- Mobile hamburger -->
-  <button class="sidebar-toggle" id="sidebarToggle" aria-label="Menu">☰</button>
-  <!-- Sidebar overlay -->
-  <div class="sidebar-overlay" id="sidebarOverlay"></div>
-
-  <div class="dashboard-layout" id="dashboardPage">
-
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
-      <div class="sidebar-header">
-        <img src="../assets/logo_padiamom.png" alt="PediaMom" class="sidebar-logo">
-        <span>PediaMom</span>
-      </div>
-
-      <nav class="menu">
-        <a class="menu-item active" data-page="home">🏠 <span data-i18n="nav_home">Dashboard</span></a>
-        <a class="menu-item" data-page="children">👶 <span data-i18n="nav_children">Children</span></a>
-        <a class="menu-item" data-page="medicines">💊 <span data-i18n="nav_medicines">Medicines</span></a>
-        <a class="menu-item" data-page="checklist">📋 <span data-i18n="nav_checklist">Checklist</span></a>
-        <a class="menu-item" data-page="vaccination">💉 <span data-i18n="nav_vaccination">Vaccination</span></a>
-        <a class="menu-item" data-page="childhealth">🏥 <span data-i18n="nav_childhealth">Child Health</span></a>
-        <a class="menu-item" data-page="family">👨‍👩‍👧 <span data-i18n="nav_family">Family</span></a>
-        <a class="menu-item" data-page="notifications">🔔 <span data-i18n="nav_notifications">Notifications</span></a>
-        <a class="menu-item" data-page="knowledgebase">📚 <span data-i18n="nav_knowledgebase">Knowledge Base</span></a>
-        <a class="menu-item" data-page="addanalysis">🧪 <span data-i18n="nav_addanalysis">Add Analysis</span></a>
-        <a class="menu-item" data-page="results">📈 <span data-i18n="nav_results">Results</span></a>
-        <a class="menu-item" data-page="savedarticles">⭐ <span data-i18n="nav_savedarticles">Saved Articles</span></a>
-        <a class="menu-item" data-page="motherhealth">👩 <span data-i18n="nav_motherhealth">Mother Health</span></a>
-        <a class="menu-item" data-page="pregnancy">🩸 <span data-i18n="nav_pregnancy">Period Tracker</span></a>
-        <a class="menu-item hidden" data-page="admin" id="adminMenu">👑 <span data-i18n="nav_admin">Admin</span></a>
-        <a class="menu-item" data-page="billing">💳 <span data-i18n="nav_billing">Billing</span></a>
-        <a class="menu-item" data-page="settings">⚙️ <span data-i18n="nav_settings">Settings</span></a>
-      </nav>
-
-      <!-- Language switcher -->
-      <div class="lang-switcher">
-        <button class="lang-btn" id="langUz">🇺🇿 UZ</button>
-        <button class="lang-btn" id="langEn">🇬🇧 EN</button>
-      </div>
-
-      <button id="logoutBtn" class="logout-btn" data-i18n="logout">Logout</button>
-    </aside>
-
-    <!-- MAIN CONTENT -->
-    <main class="main-content">
-      <div id="page-content">
-      <h1>Welcome back 👋</h1>
-
-      <div class="cards">
-
-        <div class="card">
-          <h3>Children</h3>
-          <p>Manage your children profiles</p>
+    <div class="dashboard-layout" id="dashboardPage">
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <img
+            src="../assets/logo_padiamom.png"
+            alt="PediaMom"
+            class="sidebar-logo"
+          />
+          <span>PediaMom</span>
         </div>
 
-        <div class="card">
-          <h3>Medicines</h3>
-          <p>Track medicine schedules</p>
+        <nav class="menu">
+          <a class="menu-item active" data-page="home"
+            >🏠 <span data-i18n="nav_home">Dashboard</span></a
+          >
+          <a class="menu-item" data-page="children"
+            >👶 <span data-i18n="nav_children">Children</span></a
+          >
+          <a class="menu-item" data-page="medicines"
+            >💊 <span data-i18n="nav_medicines">Medicines</span></a
+          >
+          <a class="menu-item" data-page="checklist"
+            >📋 <span data-i18n="nav_checklist">Checklist</span></a
+          >
+          <a class="menu-item" data-page="vaccination"
+            >💉 <span data-i18n="nav_vaccination">Vaccination</span></a
+          >
+          <a class="menu-item" data-page="childhealth"
+            >🏥 <span data-i18n="nav_childhealth">Child Health</span></a
+          >
+          <a class="menu-item" data-page="family"
+            >👨‍👩‍👧 <span data-i18n="nav_family">Family</span></a
+          >
+          <a class="menu-item" data-page="notifications"
+            >🔔 <span data-i18n="nav_notifications">Notifications</span></a
+          >
+          <a class="menu-item" data-page="knowledgebase"
+            >📚 <span data-i18n="nav_knowledgebase">Knowledge Base</span></a
+          >
+          <a class="menu-item" data-page="addanalysis"
+            >🧪 <span data-i18n="nav_addanalysis">Add Analysis</span></a
+          >
+          <a class="menu-item" data-page="results"
+            >📈 <span data-i18n="nav_results">Results</span></a
+          >
+          <a class="menu-item" data-page="savedarticles"
+            >⭐ <span data-i18n="nav_savedarticles">Saved Articles</span></a
+          >
+          <a class="menu-item" data-page="motherhealth"
+            >👩 <span data-i18n="nav_motherhealth">Mother Health</span></a
+          >
+          <a class="menu-item" data-page="pregnancy"
+            >🩸 <span data-i18n="nav_pregnancy">Period Tracker</span></a
+          >
+          <a class="menu-item hidden" data-page="admin" id="adminMenu"
+            >👑 <span data-i18n="nav_admin">Admin</span></a
+          >
+          <a class="menu-item" data-page="billing"
+            >💳 <span data-i18n="nav_billing">Billing</span></a
+          >
+          <a class="menu-item" data-page="settings"
+            >⚙️ <span data-i18n="nav_settings">Settings</span></a
+          >
+        </nav>
+
+        <!-- Language switcher -->
+        <div class="lang-switcher">
+          <button class="lang-btn" id="langUz">🇺🇿 UZ</button>
+          <button class="lang-btn" id="langEn">🇬🇧 EN</button>
         </div>
 
-        <div class="card">
-          <h3>Checklist</h3>
-          <p>View growth trends</p>
+        <button id="logoutBtn" class="logout-btn" data-i18n="logout">
+          Logout
+        </button>
+      </aside>
+
+      <!-- MAIN CONTENT -->
+      <main class="main-content">
+        <div id="page-content">
+          <h1>Welcome back 👋</h1>
+
+          <div class="cards">
+            <div class="card">
+              <h3>Children</h3>
+              <p>Manage your children profiles</p>
+            </div>
+
+            <div class="card">
+              <h3>Medicines</h3>
+              <p>Track medicine schedules</p>
+            </div>
+
+            <div class="card">
+              <h3>Checklist</h3>
+              <p>View growth trends</p>
+            </div>
+          </div>
         </div>
-
-      </div>
-      </div>
-    </main>
-
-  </div>
+      </main>
+    </div>
     <!-- 🔴 CONFIRM DELETE MODAL (GLOBAL FOR DASHBOARD) -->
-  <div id="confirmModal" class="pm-modal hidden">
-    <div class="pm-modal-box">
-      <p id="confirmText" data-i18n="are_you_sure">Are you sure?</p>
-      <div class="pm-modal-actions">
-        <button id="confirmYes" class="pm-danger" data-i18n="delete">Delete</button>
-        <button id="confirmNo" data-i18n="cancel">Cancel</button>
+    <div id="confirmModal" class="pm-modal hidden">
+      <div class="pm-modal-box">
+        <p id="confirmText" data-i18n="are_you_sure">Are you sure?</p>
+        <div class="pm-modal-actions">
+          <button id="confirmYes" class="pm-danger" data-i18n="delete">
+            Delete
+          </button>
+          <button id="confirmNo" data-i18n="cancel">Cancel</button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div id="logoutModal" class="pm-modal hidden">
-    <div class="pm-modal-box">
-      <p data-i18n="logout_confirm">Are you sure you want to logout?</p>
-      <div class="pm-modal-actions">
-        <button id="logoutConfirmYes" class="pm-danger" data-i18n="logout">Logout</button>
-        <button id="logoutConfirmNo" data-i18n="cancel">Cancel</button>
+    <div id="logoutModal" class="pm-modal hidden">
+      <div class="pm-modal-box">
+        <p data-i18n="logout_confirm">Are you sure you want to logout?</p>
+        <div class="pm-modal-actions">
+          <button id="logoutConfirmYes" class="pm-danger" data-i18n="logout">
+            Logout
+          </button>
+          <button id="logoutConfirmNo" data-i18n="cancel">Cancel</button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <script>
-    window.__SUPABASE_URL__ = 'https://wgexnndxnfjzxlxncezu.supabase.co';
-    window.__SUPABASE_ANON_KEY__ = 'sb_publishable_E1JW4R0JEpe_V5PmCIGDVw_zMiLXtJT';
-    // Production: Railway URL ga o'zgartiring
-    // window.__API_BASE_URL__ = 'https://pediamom-production.up.railway.app';
-    window.__API_BASE_URL__ = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      ? 'http://localhost:3001'
-      : 'https://pediamom-production.up.railway.app';
-    // Railway backend: https://pediamom-production.up.railway.app
-  </script>
-  <script type="module" src="../js/dashboard.js"></script>
-  <script type="module">
-    import { initI18n, setLang, getLang } from '../js/i18n.js';
-    initI18n();
-    document.addEventListener('DOMContentLoaded', () => {
-      const uzBtn = document.getElementById('langUz');
-      const enBtn = document.getElementById('langEn');
-      function updateBtns() {
-        const lang = getLang();
-        uzBtn?.classList.toggle('active', lang === 'uz');
-        enBtn?.classList.toggle('active', lang === 'en');
+    <script>
+      window.__SUPABASE_URL__ = "https://wgexnndxnfjzxlxncezu.supabase.co";
+      window.__SUPABASE_ANON_KEY__ =
+        "sb_publishable_E1JW4R0JEpe_V5PmCIGDVw_zMiLXtJT";
+      // Production: Railway URL ga o'zgartiring
+      // window.__API_BASE_URL__ = 'https://pediamom-production.up.railway.app';
+      window.__API_BASE_URL__ =
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1"
+          ? "http://localhost:3001"
+          : "https://pediamom-production.up.railway.app";
+      // Restore dark mode immediately to prevent flash
+      if (localStorage.getItem("pediamom_darkmode") === "1") {
+        document.body.dataset.theme = "dark";
       }
-      uzBtn?.addEventListener('click', () => { setLang('uz'); updateBtns(); });
-      enBtn?.addEventListener('click', () => { setLang('en'); updateBtns(); });
-      updateBtns();
-    });
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-</body>
+    </script>
+    <script type="module" src="../js/dashboard.js"></script>
+    <script type="module">
+      import { initI18n, setLang, getLang } from "../js/i18n.js";
+      initI18n();
+      document.addEventListener("DOMContentLoaded", () => {
+        const uzBtn = document.getElementById("langUz");
+        const enBtn = document.getElementById("langEn");
+        function updateBtns() {
+          const lang = getLang();
+          uzBtn?.classList.toggle("active", lang === "uz");
+          enBtn?.classList.toggle("active", lang === "en");
+        }
+        uzBtn?.addEventListener("click", () => {
+          setLang("uz");
+          updateBtns();
+        });
+        enBtn?.addEventListener("click", () => {
+          setLang("en");
+          updateBtns();
+        });
+        updateBtns();
+      });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </body>
 </html>

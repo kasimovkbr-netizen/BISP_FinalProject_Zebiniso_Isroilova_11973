@@ -129,7 +129,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const email = document.getElementById("resetEmail").value;
       const resetMessage = document.getElementById("resetMessage");
       try {
-        const { error } = await supabase.auth.resetPasswordForEmail(email);
+        const redirectTo =
+          window.location.origin +
+          window.location.pathname.replace("login.html", "dashboard.html");
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo,
+        });
         if (error) throw error;
         resetMessage.textContent = "✅ Reset email sent! Check your inbox.";
       } catch (err) {

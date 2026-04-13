@@ -463,7 +463,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   </div>
   <div class="settings-section">
     <h3>📱 ${t("telegram_notifications")}</h3>
-    <p style="font-size:13px;color:#64748b;">${t("telegram_hint")}</p>
+    <p style="font-size:13px;color:#64748b;">
+      Send <code>/start</code> to 
+      <a href="https://t.me/PediaMomBot" target="_blank" rel="noopener" style="color:#2563eb;font-weight:600;">@PediaMomBot</a>
+      to get your Chat ID
+    </p>
     <div class="settings-field">
       <label>${t("telegram_chat_id")}</label>
       <input type="text" id="telegramChatId" placeholder="-100xxxxxxxxx" />
@@ -543,6 +547,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Listen for auth state changes
   supabase.auth.onAuthStateChange(async (event, session) => {
+    // Handle password recovery flow
+    if (event === "PASSWORD_RECOVERY") {
+      showPasswordResetModal();
+      return;
+    }
     if (!session) {
       window.location.href = "../auth/login.html";
       return;
@@ -813,3 +822,53 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 });
+
+// ─── Password Reset Modal (triggered by email link) ───────────────────────────
+function showPasswordResetModal() {
+  document.getElementById("pwResetModal")?.remove();
+  const modal = document.createElement("div");
+  modal.id = "pwResetModal";
+  modal.style.cssText =
+    "position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;";
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:28px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+      <h3 style="margin:0 0 8px;color:#1e293b;">🔒 Set New Password</h3>
+      <p style="font-size:13px;color:#64748b;margin:0 0 20px;">Enter your new password below.</p>
+      <input type="password" id="newPwInput" placeholder="New password (min 6 chars)" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #e2e8f0;font-size:14px;margin-bottom:10px;box-sizing:border-box;" />
+      <input type="password" id="confirmPwInput" placeholder="Confirm new password" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #e2e8f0;font-size:14px;margin-bottom:16px;box-sizing:border-box;" />
+      <p id="pwResetError" style="color:#ef4444;font-size:13px;margin:0 0 12px;display:none;"></p>
+      <button id="savePwBtn" style="width:100%;background:#2563eb;color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:600;cursor:pointer;">Save Password</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  document.getElementById("savePwBtn").addEventListener("click", async () => {
+    const pw = document.getElementById("newPwInput").value;
+    const confirm = document.getElementById("confirmPwInput").value;
+    const errEl = document.getElementById("pwResetError");
+
+    if (pw.length < 6) {
+      errEl.textContent = "Password must be at least 6 characters.";
+      errEl.style.display = "block";
+      return;
+    }
+    if (pw !== confirm) {
+      errEl.textContent = "Passwords do not match.";
+      errEl.style.display = "block";
+      return;
+    }
+    errEl.style.display = "none";
+
+    const { error } = await supabase.auth.updateUser({ password: pw });
+    if (error) {
+      errEl.textContent = error.message;
+      errEl.style.display = "block";
+      return;
+    }
+    modal.remove();
+    // Show success toast
+    import("./toast.js").then(({ toast }) =>
+      toast("✅ Password updated successfully!", "success"),
+    );
+  });
+}

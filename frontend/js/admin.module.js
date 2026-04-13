@@ -634,7 +634,6 @@ function showArticleModal({ title, article }) {
         content: document.getElementById("artContent").value.trim(),
         warning: document.getElementById("artWarning").value.trim() || null,
         category: document.getElementById("artCategory").value,
-        updated_at: new Date().toISOString(),
       };
       try {
         if (article) {
