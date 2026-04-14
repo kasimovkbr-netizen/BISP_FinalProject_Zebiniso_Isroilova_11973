@@ -585,13 +585,13 @@ const CAT_LABELS = {
 };
 
 export function openAddArticleModal() {
-  showArticleModal({ title: "Yangi maqola qo'shish", article: null });
+  showArticleModal({ title: "➕ Add New Article", article: null });
 }
 
 function openEditArticleModal(id) {
   const article = allArticles.find((a) => a.id === id);
   if (!article) return;
-  showArticleModal({ title: "Maqolani tahrirlash", article });
+  showArticleModal({ title: "✏️ Edit Article", article });
 }
 
 function showArticleModal({ title, article }) {
@@ -600,20 +600,53 @@ function showArticleModal({ title, article }) {
   modal.id = "adminArticleModal";
   modal.className = "admin-modal-overlay";
   modal.innerHTML = `
-    <div class="admin-modal-box" style="max-width:560px;">
+    <div class="admin-modal-box" style="max-width:680px;max-height:90vh;overflow-y:auto;">
       <h3>${title}</h3>
       <form id="adminArticleForm">
-        <input type="text" id="artTitle" placeholder="Sarlavha *" value="${esc(article?.title || "")}" required />
-        <input type="text" id="artSummary" placeholder="Qisqacha tavsif *" value="${esc(article?.summary || "")}" required />
-        <textarea id="artContent" placeholder="To'liq matn *" rows="5" required>${esc(article?.content || "")}</textarea>
-        <textarea id="artWarning" placeholder="Ogohlantirish (ixtiyoriy)" rows="2">${esc(article?.warning || "")}</textarea>
-        <select id="artCategory" required>
-          <option value="">Kategoriya tanlang</option>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">🇬🇧 Title (English) *</label>
+            <input type="text" id="artTitle" placeholder="Article title in English" value="${esc(article?.title || "")}" required style="width:100%;box-sizing:border-box;" />
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">🇺🇿 Sarlavha (O'zbek)</label>
+            <input type="text" id="artTitleUz" placeholder="Maqola sarlavhasi o'zbekcha" value="${esc(article?.title_uz || "")}" style="width:100%;box-sizing:border-box;" />
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">🇬🇧 Summary (English) *</label>
+            <input type="text" id="artSummary" placeholder="Short description in English" value="${esc(article?.summary || "")}" required style="width:100%;box-sizing:border-box;" />
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">🇺🇿 Qisqacha tavsif (O'zbek)</label>
+            <input type="text" id="artSummaryUz" placeholder="Qisqacha tavsif o'zbekcha" value="${esc(article?.summary_uz || "")}" style="width:100%;box-sizing:border-box;" />
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">🇬🇧 Content (English) *</label>
+            <textarea id="artContent" placeholder="Full article text in English" rows="6" required style="width:100%;box-sizing:border-box;">${esc(article?.content || "")}</textarea>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">🇺🇿 Matn (O'zbek)</label>
+            <textarea id="artContentUz" placeholder="To'liq matn o'zbekcha" rows="6" style="width:100%;box-sizing:border-box;">${esc(article?.content_uz || "")}</textarea>
+          </div>
+        </div>
+
+        <textarea id="artWarning" placeholder="⚠️ Warning (optional)" rows="2" style="width:100%;box-sizing:border-box;">${esc(article?.warning || "")}</textarea>
+
+        <select id="artCategory" required style="width:100%;box-sizing:border-box;">
+          <option value="">Select category</option>
           ${CATEGORIES.map((c) => `<option value="${c}" ${article?.category === c ? "selected" : ""}>${CAT_LABELS[c]}</option>`).join("")}
         </select>
+
         <div class="admin-modal-actions">
-          <button type="submit" class="admin-add-btn">💾 Saqlash</button>
-          <button type="button" id="closeAdminModal">Bekor qilish</button>
+          <button type="submit" class="admin-add-btn">💾 Save</button>
+          <button type="button" id="closeAdminModal">Cancel</button>
         </div>
       </form>
     </div>
@@ -623,14 +656,20 @@ function showArticleModal({ title, article }) {
   modal.addEventListener("click", (e) => {
     if (e.target === modal) modal.remove();
   });
+
   modal
     .querySelector("#adminArticleForm")
     .addEventListener("submit", async (e) => {
       e.preventDefault();
       const data = {
         title: document.getElementById("artTitle").value.trim(),
+        title_uz: document.getElementById("artTitleUz").value.trim() || null,
         summary: document.getElementById("artSummary").value.trim(),
+        summary_uz:
+          document.getElementById("artSummaryUz").value.trim() || null,
         content: document.getElementById("artContent").value.trim(),
+        content_uz:
+          document.getElementById("artContentUz").value.trim() || null,
         warning: document.getElementById("artWarning").value.trim() || null,
         category: document.getElementById("artCategory").value,
       };
@@ -641,18 +680,18 @@ function showArticleModal({ title, article }) {
             .update(data)
             .eq("id", article.id);
           if (error) throw error;
-          toast("✅ Maqola yangilandi", "success");
+          toast("✅ Article updated", "success");
         } else {
           const { error } = await supabase
             .from("knowledge_base")
             .insert({ ...data, created_at: new Date().toISOString() });
           if (error) throw error;
-          toast("✅ Maqola qo'shildi", "success");
+          toast("✅ Article added", "success");
         }
         modal.remove();
         await loadArticles();
       } catch (err) {
-        toast("Xato: " + err.message, "error");
+        toast("Error: " + err.message, "error");
       }
     });
 }
