@@ -246,36 +246,60 @@ function setupEventListeners() {
   const changePasswordBtn = document.getElementById("changePasswordBtn");
   if (changePasswordBtn) {
     changePasswordBtn.onclick = async () => {
-      const newPw = document.getElementById("newPassword")?.value;
-      const confirmPw = document.getElementById("confirmPassword")?.value;
+      const newPw = document.getElementById("newPassword")?.value?.trim();
+      const confirmPw = document
+        .getElementById("confirmPassword")
+        ?.value?.trim();
       const errorEl = document.getElementById("passwordError");
-      if (!newPw || !confirmPw) {
+
+      const showErr = (msg) => {
         if (errorEl) {
-          errorEl.textContent = "Please fill all fields";
+          errorEl.textContent = msg;
           errorEl.style.display = "block";
         }
+      };
+
+      if (!newPw || !confirmPw) {
+        showErr("Please fill all fields");
+        return;
+      }
+      if (newPw.length < 6) {
+        showErr("Password must be at least 6 characters");
         return;
       }
       if (newPw !== confirmPw) {
-        if (errorEl) {
-          errorEl.textContent = "Passwords do not match";
-          errorEl.style.display = "block";
-        }
+        showErr("Passwords do not match");
         return;
       }
       if (errorEl) errorEl.style.display = "none";
+
       try {
+        // Re-verify session is active
+        const {
+          data: { session },
+          error: sessErr,
+        } = await supabase.auth.getSession();
+        if (sessErr || !session) {
+          showErr("Session expired. Please log in again.");
+          return;
+        }
+
         const { error } = await supabase.auth.updateUser({ password: newPw });
         if (error) throw error;
-        showMessage("Password changed!");
+
+        showMessage("✅ Password changed successfully!");
         ["newPassword", "confirmPassword", "currentPassword"].forEach((id) => {
           const el = document.getElementById(id);
           if (el) el.value = "";
         });
       } catch (e) {
-        if (errorEl) {
-          errorEl.textContent = e.message;
-          errorEl.style.display = "block";
+        console.error("[settings] change password error:", e);
+        if (e.message?.includes("Auth session missing")) {
+          showErr("Session expired. Please log out and log in again.");
+        } else if (e.message?.includes("same password")) {
+          showErr("New password must be different from the current one.");
+        } else {
+          showErr(e.message || "Failed to change password. Please try again.");
         }
       }
     };
