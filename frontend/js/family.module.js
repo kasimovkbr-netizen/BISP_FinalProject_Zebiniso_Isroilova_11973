@@ -39,11 +39,8 @@ function renderShell() {
       <div class="adm-sub">${t("family_subtitle")}</div>
     </div>
     <div class="adm-tabs" id="famTabs">
-      <button class="adm-tab active" data-tab="emergency">${t("emergency")}</button>
-      <button class="adm-tab" data-tab="pediatrician">${t("pediatrician")}</button>
-      <button class="adm-tab" data-tab="insurance">${t("insurance")}</button>
+      <button class="adm-tab active" data-tab="pediatrician">${t("pediatrician")}</button>
       <button class="adm-tab" data-tab="bloodtype">${t("blood_type")}</button>
-      <button class="adm-tab" data-tab="goals">${t("goals")}</button>
       <button class="adm-tab" data-tab="notes">${t("daily_notes")}</button>
     </div>
     <div id="famContent"></div>
@@ -60,7 +57,7 @@ function setupTabs() {
       await loadTab(btn.dataset.tab);
     });
   });
-  loadTab("emergency");
+  loadTab("pediatrician");
 }
 
 async function loadTab(tab) {
@@ -68,20 +65,11 @@ async function loadTab(tab) {
   if (!el) return;
   el.innerHTML = `<div class="adm-loading">⏳ ${t("loading")}...</div>`;
   switch (tab) {
-    case "emergency":
-      await renderEmergency(el);
-      break;
     case "pediatrician":
       await renderPediatrician(el);
       break;
-    case "insurance":
-      await renderInsurance(el);
-      break;
     case "bloodtype":
       await renderBloodType(el);
-      break;
-    case "goals":
-      await renderGoals(el);
       break;
     case "notes":
       await renderNotes(el);

@@ -64,8 +64,6 @@ function renderShell() {
     <div class="adm-tabs" id="chTabs" style="flex-wrap:wrap;">
       <button class="adm-tab active" data-tab="growth">📏 ${t("growth_measurements")}</button>
       <button class="adm-tab" data-tab="doctor">🏥 ${t("doctor_visits_title")}</button>
-      <button class="adm-tab" data-tab="symptoms">🤒 ${t("symptoms_title")}</button>
-      <button class="adm-tab" data-tab="temperature">🌡️ ${t("temperature_log")}</button>
       <button class="adm-tab" data-tab="dental">🦷 ${t("dental_title")}</button>
       <button class="adm-tab" data-tab="eye">👁️ ${t("eye_title")}</button>
       <button class="adm-tab" data-tab="hearing">👂 ${t("hearing_title")}</button>
@@ -98,12 +96,6 @@ async function loadTab(tab) {
       break;
     case "doctor":
       await renderDoctorVisits(content);
-      break;
-    case "symptoms":
-      await renderSymptoms(content);
-      break;
-    case "temperature":
-      await renderTemperature(content);
       break;
     case "dental":
       await renderDental(content);
