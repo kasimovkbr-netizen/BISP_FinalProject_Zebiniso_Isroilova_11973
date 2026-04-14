@@ -47,7 +47,7 @@ async function loadChildren() {
 
 function childSelect(id) {
   return `<select id="${id}" class="ch-child-select">
-    <option value="">— Select child —</option>
+    <option value="">— ${t("select_child")} —</option>
     ${children.map((c) => `<option value="${c.id}">${c.name}</option>`).join("")}
   </select>`;
 }
@@ -57,18 +57,18 @@ function renderShell() {
   if (!page) return;
   page.innerHTML = `
     <div class="adm-header">
-      <div class="adm-title">🏥 Child Health</div>
-      <div class="adm-sub">Growth, doctor visits, symptoms, temperature and more</div>
+      <div class="adm-title">🏥 ${t("nav_childhealth")}</div>
+      <div class="adm-sub">${t("child_health_subtitle")}</div>
     </div>
     <div class="adm-tabs" id="chTabs" style="flex-wrap:wrap;">
-      <button class="adm-tab active" data-tab="growth">📏 Growth</button>
-      <button class="adm-tab" data-tab="doctor">🏥 Doctor Visits</button>
-      <button class="adm-tab" data-tab="symptoms">🤒 Symptoms</button>
-      <button class="adm-tab" data-tab="temperature">🌡️ Temperature</button>
-      <button class="adm-tab" data-tab="dental">🦷 Dental</button>
-      <button class="adm-tab" data-tab="eye">👁️ Eye</button>
-      <button class="adm-tab" data-tab="hearing">👂 Hearing</button>
-      <button class="adm-tab" data-tab="medhistory">💊 Med History</button>
+      <button class="adm-tab active" data-tab="growth">📏 ${t("growth_measurements")}</button>
+      <button class="adm-tab" data-tab="doctor">🏥 ${t("doctor_visits_title")}</button>
+      <button class="adm-tab" data-tab="symptoms">🤒 ${t("symptoms_title")}</button>
+      <button class="adm-tab" data-tab="temperature">🌡️ ${t("temperature_log")}</button>
+      <button class="adm-tab" data-tab="dental">🦷 ${t("dental_title")}</button>
+      <button class="adm-tab" data-tab="eye">👁️ ${t("eye_title")}</button>
+      <button class="adm-tab" data-tab="hearing">👂 ${t("hearing_title")}</button>
+      <button class="adm-tab" data-tab="medhistory">💊 ${t("med_history_title")}</button>
     </div>
     <div id="chContent"></div>
   `;
@@ -90,7 +90,7 @@ function setupTabs() {
 async function loadTab(tab) {
   const content = document.getElementById("chContent");
   if (!content) return;
-  content.innerHTML = `<div class="adm-loading">⏳ Loading...</div>`;
+  content.innerHTML = `<div class="adm-loading">⏳ ${t("loading")}...</div>`;
   switch (tab) {
     case "growth":
       await renderGrowth(content);
@@ -123,17 +123,17 @@ async function loadTab(tab) {
 async function renderGrowth(el) {
   el.innerHTML = `
     <div class="adm-section">
-      <div class="adm-section-title">📏 Growth Measurements</div>
+      <div class="adm-section-title">📏 ${t("growth_measurements")}</div>
       ${childSelect("growthChild")}
       <form id="growthForm" class="ch-form" style="margin-top:14px;">
         <div class="ch-form-grid">
-          <div><label>Weight (kg)</label><input type="number" id="gWeight" step="0.1" placeholder="12.5" /></div>
-          <div><label>Height (cm)</label><input type="number" id="gHeight" step="0.1" placeholder="85" /></div>
-          <div><label>Head circumference (cm)</label><input type="number" id="gHead" step="0.1" placeholder="46" /></div>
-          <div><label>Date</label><input type="date" id="gDate" required /></div>
+          <div><label>${t("weight_kg") || "Weight (kg)"}</label><input type="number" id="gWeight" step="0.1" placeholder="12.5" /></div>
+          <div><label>${t("height_cm") || "Height (cm)"}</label><input type="number" id="gHeight" step="0.1" placeholder="85" /></div>
+          <div><label>${t("head_cm") || "Head circumference (cm)"}</label><input type="number" id="gHead" step="0.1" placeholder="46" /></div>
+          <div><label>${t("date")}</label><input type="date" id="gDate" required /></div>
         </div>
-        <textarea id="gNotes" placeholder="Notes (optional)" rows="2"></textarea>
-        <button type="submit" class="adm-btn-primary">💾 Save</button>
+        <textarea id="gNotes" placeholder="${t("symptoms_placeholder") || "Notes (optional)"}" rows="2"></textarea>
+        <button type="submit" class="adm-btn-primary">💾 ${t("save")}</button>
       </form>
       <div id="growthList" style="margin-top:20px;"></div>
     </div>
@@ -147,7 +147,7 @@ async function renderGrowth(el) {
     .addEventListener("submit", async (e) => {
       e.preventDefault();
       if (!selectedChildId) {
-        toast("Please select a child", "warning");
+        toast(t("select_child_first"), "warning");
         return;
       }
       const { error } = await supabase.from("child_growth").insert({
@@ -160,10 +160,10 @@ async function renderGrowth(el) {
         notes: document.getElementById("gNotes").value.trim() || null,
       });
       if (error) {
-        toast("Error: " + error.message, "error");
+        toast(t("error") + ": " + error.message, "error");
         return;
       }
-      toast("✅ Saved", "success");
+      toast("✅ " + t("success"), "success");
       e.target.reset();
       loadGrowthList();
     });
@@ -178,11 +178,11 @@ async function loadGrowthList() {
     .eq("child_id", selectedChildId)
     .order("measured_at", { ascending: false });
   if (!data?.length) {
-    el.innerHTML = `<div class="adm-empty">No records found</div>`;
+    el.innerHTML = `<div class="adm-empty">${t("no_children") || "No records found"}</div>`;
     return;
   }
   el.innerHTML = `<div class="adm-table-wrap"><table class="adm-table">
-    <thead><tr><th>Date</th><th>Weight</th><th>Height</th><th>Head</th><th>Notes</th><th></th></tr></thead>
+    <thead><tr><th>${t("date")}</th><th>${t("weight_kg")}</th><th>${t("height_cm")}</th><th>${t("head_cm")}</th><th>${t("symptoms_notes") || "Notes"}</th><th></th></tr></thead>
     <tbody>${data
       .map(
         (r) => `<tr>
@@ -285,7 +285,7 @@ async function loadAllergyList() {
 async function renderDoctorVisits(el) {
   el.innerHTML = `
     <div class="adm-section">
-      <div class="adm-section-title">🏥 Doctor Visits</div>
+      <div class="adm-section-title">🏥 ${t("doctor_visits_title")}</div>
       ${childSelect("doctorChild")}
       <form id="doctorForm" class="ch-form" style="margin-top:14px;">
         <div class="ch-form-grid">
@@ -310,7 +310,7 @@ async function renderDoctorVisits(el) {
     .addEventListener("submit", async (e) => {
       e.preventDefault();
       if (!selectedChildId) {
-        toast("Please select a child", "warning");
+        toast(t("select_child_first"), "warning");
         return;
       }
       const { error } = await supabase.from("child_doctor_visits").insert({
@@ -325,10 +325,10 @@ async function renderDoctorVisits(el) {
         notes: document.getElementById("dNotes").value.trim() || null,
       });
       if (error) {
-        toast("Error: " + error.message, "error");
+        toast(t("error") + ": " + error.message, "error");
         return;
       }
-      toast("✅ Saved", "success");
+      toast("✅ " + t("success"), "success");
       e.target.reset();
       loadDoctorList();
     });
@@ -366,7 +366,7 @@ async function loadDoctorList() {
 async function renderSymptoms(el) {
   el.innerHTML = `
     <div class="adm-section">
-      <div class="adm-section-title">🤒 Illness Symptoms</div>
+      <div class="adm-section-title">🤒 ${t("symptoms_title")}</div>
       ${childSelect("symptomChild")}
       <form id="symptomForm" class="ch-form" style="margin-top:14px;">
         <div class="ch-form-grid">
@@ -395,7 +395,7 @@ async function renderSymptoms(el) {
     .addEventListener("submit", async (e) => {
       e.preventDefault();
       if (!selectedChildId) {
-        toast("Please select a child", "warning");
+        toast(t("select_child_first"), "warning");
         return;
       }
       const { error } = await supabase.from("child_symptoms").insert({
@@ -407,10 +407,10 @@ async function renderSymptoms(el) {
         ended_at: document.getElementById("sEnd").value || null,
       });
       if (error) {
-        toast("Error: " + error.message, "error");
+        toast(t("error") + ": " + error.message, "error");
         return;
       }
-      toast("✅ Saved", "success");
+      toast("✅ " + t("success"), "success");
       e.target.reset();
       loadSymptomList();
     });
@@ -449,7 +449,7 @@ async function loadSymptomList() {
 async function renderTemperature(el) {
   el.innerHTML = `
     <div class="adm-section">
-      <div class="adm-section-title">🌡️ Temperature Log</div>
+      <div class="adm-section-title">🌡️ ${t("temperature_log")}</div>
       ${childSelect("tempChild")}
       <form id="tempForm" class="ch-form" style="margin-top:14px;">
         <div class="ch-form-grid">
@@ -477,7 +477,7 @@ async function renderTemperature(el) {
   document.getElementById("tempForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!selectedChildId) {
-      toast("Please select a child", "warning");
+      toast(t("select_child_first"), "warning");
       return;
     }
     const { error } = await supabase.from("child_temperature_log").insert({
@@ -489,10 +489,10 @@ async function renderTemperature(el) {
       notes: document.getElementById("tNotes").value.trim() || null,
     });
     if (error) {
-      toast("Error: " + error.message, "error");
+      toast(t("error") + ": " + error.message, "error");
       return;
     }
-    toast("✅ Saved", "success");
+    toast("✅ " + t("success"), "success");
     e.target.reset();
     loadTempList();
   });
@@ -618,13 +618,32 @@ async function loadMilestoneList() {
 
 // ─── Global delete helper ─────────────────────────────────────────────────────
 window.__chDelReload = async (table, id, listId) => {
-  if (!confirm("Are you sure you want to delete this record?")) return;
+  const confirmed = await new Promise((resolve) => {
+    const toastEl = document.createElement("div");
+    toastEl.style.cssText =
+      "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:14px 20px;border-radius:12px;z-index:9999;display:flex;gap:12px;align-items:center;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,0.3);";
+    toastEl.innerHTML = `<span>${t("confirm_delete")}</span><button id="cfYes" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:600;">${t("yes")}</button><button id="cfNo" style="background:#475569;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;">${t("no")}</button>`;
+    document.body.appendChild(toastEl);
+    toastEl.querySelector("#cfYes").onclick = () => {
+      toastEl.remove();
+      resolve(true);
+    };
+    toastEl.querySelector("#cfNo").onclick = () => {
+      toastEl.remove();
+      resolve(false);
+    };
+    setTimeout(() => {
+      toastEl.remove();
+      resolve(false);
+    }, 5000);
+  });
+  if (!confirmed) return;
   const { error } = await supabase.from(table).delete().eq("id", id);
   if (error) {
-    toast("Error: " + error.message, "error");
+    toast(t("error") + ": " + error.message, "error");
     return;
   }
-  toast("✅ Deleted", "success");
+  toast("✅ " + t("delete"), "success");
   document
     .getElementById(listId)
     ?.querySelectorAll("tr")

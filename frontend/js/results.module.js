@@ -216,12 +216,8 @@ async function loadResults(parentId) {
       .map((kv) => `<span class="value-chip">${kv}</span>`)
       .join("");
 
-    const aiLabel =
-      t("ai_analysis") !== "ai_analysis" ? t("ai_analysis") : "AI Tahlil";
-    const recsLabel =
-      t("recommendations") !== "recommendations"
-        ? t("recommendations")
-        : "Tavsiyalar";
+    const aiLabel = t("ai_analysis");
+    const recsLabel = t("recommendations");
     const aiHTML = result.ai_result
       ? `
       <div class="ai-result-inline">
@@ -410,7 +406,7 @@ export function drawTrendChart(results, type) {
 
   const chartTitle =
     type === ""
-      ? "All Types Trend"
+      ? t("all_types_trend")
       : `${type.charAt(0).toUpperCase() + type.slice(1)} Trend`;
 
   if (trendChart) trendChart.destroy();

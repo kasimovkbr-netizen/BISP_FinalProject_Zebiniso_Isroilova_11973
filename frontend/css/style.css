@@ -3249,6 +3249,46 @@ input:checked + .toggle-slider:before {
   color: #f1f5f9;
 }
 
+/* Results dark mode — value chips, edit modal, buttons */
+[data-theme="dark"] .results-page .value-chip {
+  background: #1e293b;
+  color: #cbd5e1;
+  border-color: #334155;
+}
+[data-theme="dark"] .results-page .value-chip strong {
+  color: #f1f5f9;
+}
+[data-theme="dark"] .results-page .child-name {
+  color: #f1f5f9;
+}
+[data-theme="dark"] .results-page .date {
+  color: #94a3b8;
+}
+[data-theme="dark"] .results-page .editBtn,
+[data-theme="dark"] .results-page .deleteBtn {
+  background: #1e293b;
+  color: #cbd5e1;
+  border-color: #334155;
+}
+[data-theme="dark"] .results-page #editModal {
+  background: #1e293b;
+  color: #f1f5f9;
+}
+[data-theme="dark"] .results-page #editModal input {
+  background: #0f172a;
+  color: #f1f5f9;
+  border-color: #334155;
+}
+[data-theme="dark"] .results-page .hint {
+  color: #64748b;
+}
+[data-theme="dark"] .results-page h3 {
+  color: #f1f5f9;
+}
+[data-theme="dark"] .results-page label {
+  color: #94a3b8;
+}
+
 /* Add analysis */
 [data-theme="dark"] .addanalysis {
   background: #0f172a;

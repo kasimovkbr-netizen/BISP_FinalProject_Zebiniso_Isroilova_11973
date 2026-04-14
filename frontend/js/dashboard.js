@@ -547,6 +547,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       showPasswordResetModal();
       return;
     }
+    // Ignore initial session — already handled by getSession() above
+    if (event === "INITIAL_SESSION") return;
     if (!session) {
       window.location.href = "../auth/login.html";
       return;

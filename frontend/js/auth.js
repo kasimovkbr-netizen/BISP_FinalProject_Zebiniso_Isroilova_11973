@@ -9,15 +9,16 @@ let isRegistering = false;
    AUTH GUARD (FINAL)
 ======================= */
 supabase.auth.onAuthStateChange((event, session) => {
+  // Ignore initial session check — let getSession() handle it
+  if (event === "INITIAL_SESSION") return;
+
   const user = session?.user ?? null;
   const path = window.location.pathname;
 
   const isIndex = path.endsWith("/") || path.endsWith("index.html");
-
   const isLogin = path.includes("login.html");
   const isRegister = path.includes("register.html");
   const isAuthPage = isLogin || isRegister;
-
   const isDashboard = path.includes("dashboard.html");
 
   // 🚫 login bo'lmagan user dashboardga kira olmaydi

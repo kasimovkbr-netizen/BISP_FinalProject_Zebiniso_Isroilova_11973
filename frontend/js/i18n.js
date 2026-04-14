@@ -351,6 +351,66 @@ Object.assign(TRANSLATIONS.en, {
   access_denied: "Access denied: admins only",
 });
 
+// ─── Additional keys ──────────────────────────────────────────────────────────
+Object.assign(TRANSLATIONS.en, {
+  // Family
+  emergency_contacts: "Emergency Contacts",
+  pediatrician_doctors: "Pediatricians",
+  insurance_info: "Insurance Information",
+  blood_type_title: "Blood Type",
+  health_goals_title: "Health Goals",
+  daily_notes_title: "Daily Notes",
+  add_btn: "Add",
+  save_btn: "Save",
+  confirm_delete: "Are you sure you want to delete this?",
+  // Child Health
+  child_health_subtitle:
+    "Growth, doctor visits, symptoms, temperature and more",
+  growth_measurements: "Growth Measurements",
+  doctor_visits_title: "Doctor Visits",
+  symptoms_title: "Illness Symptoms",
+  temperature_log: "Temperature Log",
+  dental_title: "Dental Visits",
+  eye_title: "Eye Examination",
+  hearing_title: "Hearing Test",
+  med_history_title: "Med History",
+  // Knowledge Base
+  kb_category_harmful: "Harmful Medicines",
+  kb_category_immunity: "Immunity Tips",
+  kb_category_vaccines: "Vaccines Info",
+  kb_category_herbal: "Natural Herbal Beverages",
+  kb_category_nutrition: "Child Nutrition Tips",
+  kb_category_sleep: "Sleep & Development",
+  // Results
+  all_types_trend: "All Types Trend",
+  error_update: "Error updating analysis!",
+  error_delete: "Error deleting analysis!",
+  // Billing
+  credits_label: "Credits",
+  per_credit: "per credit",
+  // Notifications
+  mark_read: "Mark as read",
+  // Pregnancy
+  period_late: "Period is late",
+  days_late: "days late",
+  period_expected: "Period expected in",
+  pms_window: "PMS window — period in",
+  days: "day(s)",
+  no_cycle_history: "No cycle history yet",
+  // Mother Health
+  my_supplements_title: "My Supplements",
+  no_supplements_yet: "No supplements added yet.",
+  supplement_added: "Supplement added!",
+  // Admin
+  confirm_give_credits: "Give 10 credits to all users with zero balance?",
+  confirm_delete_article: "Delete this article?",
+  credits_added: "Credits added successfully",
+  // Child Health extra labels
+  weight_kg: "Weight (kg)",
+  height_cm: "Height (cm)",
+  head_cm: "Head circumference (cm)",
+});
+
 Object.assign(TRANSLATIONS.uz, {
   // COMMON
   save: "Saqlash",
@@ -621,6 +681,65 @@ Object.assign(TRANSLATIONS.uz, {
   status: "Holat",
   no_feedback: "Hali fikr-mulohazalar yo'q.",
   access_denied: "Ruxsat yo'q: faqat admin",
+});
+
+Object.assign(TRANSLATIONS.uz, {
+  // Family
+  emergency_contacts: "Shoshilinch aloqa raqamlari",
+  pediatrician_doctors: "Pediatr shifokorlar",
+  insurance_info: "Sug'urta ma'lumotlari",
+  blood_type_title: "Qon guruhi",
+  health_goals_title: "Sog'liq maqsadlari",
+  daily_notes_title: "Kunlik eslatmalar",
+  add_btn: "Qo'shish",
+  save_btn: "Saqlash",
+  confirm_delete: "O'chirishni tasdiqlaysizmi?",
+  // Child Health
+  child_health_subtitle: "O'sish, shifokor, belgilar, harorat va boshqalar",
+  growth_measurements: "O'sish ko'rsatkichlari",
+  doctor_visits_title: "Shifokor tashriflari",
+  symptoms_title: "Kasallik belgilari",
+  temperature_log: "Harorat jurnali",
+  dental_title: "Tish shifokor tashriflari",
+  eye_title: "Ko'z tekshiruvi",
+  hearing_title: "Eshitish tekshiruvi",
+  med_history_title: "Dori tarixi",
+  // Knowledge Base
+  kb_category_harmful: "Zararli dorilar",
+  kb_category_immunity: "Immunitet maslahatlari",
+  kb_category_vaccines: "Emlash haqida ma'lumot",
+  kb_category_herbal: "Tabiiy o'simlik ichimliklar",
+  kb_category_nutrition: "Bola ovqatlanishi maslahatlari",
+  kb_category_sleep: "Uyqu va rivojlanish",
+  // Results
+  all_types_trend: "Barcha turlar tendentsiyasi",
+  error_update: "Tahlilni yangilashda xato!",
+  error_delete: "Tahlilni o'chirishda xato!",
+  // Billing
+  credits_label: "Kredit",
+  per_credit: "kredit uchun",
+  // Notifications
+  mark_read: "O'qildi",
+  // Pregnancy
+  period_late: "Hayz kechikmoqda",
+  days_late: "kun kechikdi",
+  period_expected: "Hayz kutilmoqda",
+  pms_window: "PMS oynasi — hayz",
+  days: "kun",
+  no_cycle_history: "Hali sikl tarixi yo'q",
+  // Mother Health
+  my_supplements_title: "Mening qo'shimchalarim",
+  no_supplements_yet: "Hali qo'shimcha qo'shilmagan.",
+  supplement_added: "Qo'shimcha qo'shildi!",
+  // Admin
+  confirm_give_credits:
+    "Kreditlari tugagan barcha foydalanuvchilarga 10 kredit berish?",
+  confirm_delete_article: "Bu maqolani o'chirish?",
+  credits_added: "Kredit muvaffaqiyatli qo'shildi",
+  // Child Health extra labels
+  weight_kg: "Og'irlik (kg)",
+  height_cm: "Bo'y (cm)",
+  head_cm: "Bosh aylanasi (cm)",
 });
 
 // ─── Core i18n engine ─────────────────────────────────────────────────────────

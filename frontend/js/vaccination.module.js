@@ -31,12 +31,6 @@ export async function initVaccinationModule() {
 
   userId = session.user.id;
 
-  supabase.auth.onAuthStateChange((event, sess) => {
-    if (event === "SIGNED_OUT" || !sess) {
-      window.location.href = "../auth/login.html";
-    }
-  });
-
   await loadChildrenDropdown();
   setupChildFilter();
   toggleList(false);

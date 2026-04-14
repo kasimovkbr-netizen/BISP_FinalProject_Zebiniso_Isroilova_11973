@@ -243,11 +243,11 @@ function renderPredictions(periodData) {
 
   let statusMsg = "";
   if (daysUntilNext < 0) {
-    statusMsg = `<div class="pred-alert pred-late">⚠️ Period is ${Math.abs(daysUntilNext)} days late</div>`;
+    statusMsg = `<div class="pred-alert pred-late">⚠️ ${t("period_late")}: ${Math.abs(daysUntilNext)} ${t("days_late")}</div>`;
   } else if (daysUntilNext <= 2) {
-    statusMsg = `<div class="pred-alert pred-soon">🔴 Period expected in ${daysUntilNext} day${daysUntilNext !== 1 ? "s" : ""}</div>`;
+    statusMsg = `<div class="pred-alert pred-soon">🔴 ${t("period_expected")} ${daysUntilNext} ${t("days")}</div>`;
   } else if (today >= pmsStart && today < next) {
-    statusMsg = `<div class="pred-alert pred-pms">🟡 PMS window — period in ${daysUntilNext} days</div>`;
+    statusMsg = `<div class="pred-alert pred-pms">🟡 ${t("pms_window")} ${daysUntilNext} ${t("days")}</div>`;
   }
 
   el.innerHTML = `
@@ -256,32 +256,32 @@ function renderPredictions(periodData) {
       <div class="pred-card pred-card-red">
         <span class="pred-icon">🔴</span>
         <div>
-          <div class="pred-label">Next Period</div>
+          <div class="pred-label">${t("next_period")}</div>
           <div class="pred-value">${fmt(next)}</div>
-          <div class="pred-sub">${daysUntilNext > 0 ? `in ${daysUntilNext} days` : daysUntilNext === 0 ? "today" : `${Math.abs(daysUntilNext)}d late`}</div>
+          <div class="pred-sub">${daysUntilNext > 0 ? `${t("remaining")} ${daysUntilNext} ${t("days")}` : daysUntilNext === 0 ? "today" : `${Math.abs(daysUntilNext)}d ${t("days_late")}`}</div>
         </div>
       </div>
       <div class="pred-card pred-card-blue">
         <span class="pred-icon">💙</span>
         <div>
-          <div class="pred-label">Ovulation</div>
+          <div class="pred-label">${t("ovulation")}</div>
           <div class="pred-value">${fmt(ovulationDay)}</div>
-          <div class="pred-sub">Day ${cycleLength - 14} of cycle</div>
+          <div class="pred-sub">Day ${cycleLength - 14}</div>
         </div>
       </div>
       <div class="pred-card pred-card-green">
         <span class="pred-icon">🟢</span>
         <div>
-          <div class="pred-label">Fertile Window</div>
+          <div class="pred-label">${t("fertile_window")}</div>
           <div class="pred-value">${fmt(fertileStart)} – ${fmt(fertileEnd)}</div>
-          <div class="pred-sub">6 days</div>
+          <div class="pred-sub">6 ${t("days")}</div>
         </div>
       </div>
       <div class="pred-card pred-card-yellow">
         <span class="pred-icon">🟡</span>
         <div>
-          <div class="pred-label">Cycle Length</div>
-          <div class="pred-value">${cycleLength} days</div>
+          <div class="pred-label">${t("cycle_length")}</div>
+          <div class="pred-value">${cycleLength} ${t("days")}</div>
           <div class="pred-sub">avg</div>
         </div>
       </div>
@@ -298,7 +298,7 @@ function renderHistory(history) {
   if (!el) return;
 
   if (!history.length) {
-    el.innerHTML = `<p style="color:#94a3b8;font-size:14px;text-align:center;padding:16px;">No cycle history yet</p>`;
+    el.innerHTML = `<p style="color:#94a3b8;font-size:14px;text-align:center;padding:16px;">${t("no_cycle_history")}</p>`;
     return;
   }
 

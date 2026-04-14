@@ -92,9 +92,9 @@ async function loadNotifications() {
       <div class="notif-body">
         <div class="notif-title">${n.title || n.type}</div>
         <div class="notif-msg">${n.message || ""}</div>
-        <div class="notif-time">${new Date(n.created_at).toLocaleString("uz-UZ")}</div>
+        <div class="notif-time">${new Date(n.created_at).toLocaleString()}</div>
       </div>
-      ${!n.read ? `<button class="adm-btn-sm blue notif-read-btn" data-id="${n.id}">${t("read") !== "read" ? t("read") : "O'qildi"}</button>` : ""}
+      ${!n.read ? `<button class="adm-btn-sm blue notif-read-btn" data-id="${n.id}">${t("mark_read")}</button>` : ""}
     </div>
   `,
     )

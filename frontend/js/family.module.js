@@ -98,18 +98,18 @@ async function renderEmergency(el) {
     .order("created_at");
   el.innerHTML = `
     <div class="adm-section">
-      <div class="adm-section-title">🆘 Shoshilinch aloqa raqamlari</div>
+      <div class="adm-section-title">🆘 ${t("emergency_contacts")}</div>
       <form id="ecForm" class="ch-form">
         <div class="ch-form-grid">
-          <div><label>Ism *</label><input type="text" id="ecName" placeholder="Buvisi Malika" required /></div>
-          <div><label>Munosabat</label><input type="text" id="ecRel" placeholder="Buvi, amaki..." /></div>
-          <div><label>Telefon *</label><input type="tel" id="ecPhone" placeholder="+998901234567" required /></div>
+          <div><label>${t("name")} *</label><input type="text" id="ecName" placeholder="${t("name")}" required /></div>
+          <div><label>${t("relationship")}</label><input type="text" id="ecRel" placeholder="${t("relationship")}" /></div>
+          <div><label>${t("phone")} *</label><input type="tel" id="ecPhone" placeholder="+998901234567" required /></div>
         </div>
-        <button type="submit" class="adm-btn-primary">➕ Qo'shish</button>
+        <button type="submit" class="adm-btn-primary">➕ ${t("add_btn")}</button>
       </form>
       <div class="adm-table-wrap" style="margin-top:16px;">
         <table class="adm-table">
-          <thead><tr><th>Ism</th><th>Munosabat</th><th>Telefon</th><th></th></tr></thead>
+          <thead><tr><th>${t("name")}</th><th>${t("relationship")}</th><th>${t("phone")}</th><th></th></tr></thead>
           <tbody id="ecList">
             ${(data || [])
               .map(
@@ -135,10 +135,10 @@ async function renderEmergency(el) {
       phone: document.getElementById("ecPhone").value.trim(),
     });
     if (error) {
-      toast("Xato: " + error.message, "error");
+      toast(t("error") + ": " + error.message, "error");
       return;
     }
-    toast("✅ Qo'shildi", "success");
+    toast("✅ " + t("success"), "success");
     await renderEmergency(el);
   });
 }
@@ -152,19 +152,19 @@ async function renderPediatrician(el) {
     .order("created_at");
   el.innerHTML = `
     <div class="adm-section">
-      <div class="adm-section-title">👨‍⚕️ Pediatr shifokorlar</div>
+      <div class="adm-section-title">👨‍⚕️ ${t("pediatrician_doctors")}</div>
       <form id="pedForm" class="ch-form">
         <div class="ch-form-grid">
-          <div><label>Ism *</label><input type="text" id="pedName" placeholder="Dr. Karimov" required /></div>
-          <div><label>Klinika</label><input type="text" id="pedClinic" placeholder="1-son poliklinika" /></div>
-          <div><label>Telefon</label><input type="tel" id="pedPhone" placeholder="+998..." /></div>
-          <div><label>Manzil</label><input type="text" id="pedAddr" placeholder="Toshkent, Chilonzor..." /></div>
+          <div><label>${t("name")} *</label><input type="text" id="pedName" placeholder="Dr. Smith" required /></div>
+          <div><label>${t("clinic")}</label><input type="text" id="pedClinic" placeholder="${t("clinic")}" /></div>
+          <div><label>${t("phone")}</label><input type="tel" id="pedPhone" placeholder="+998..." /></div>
+          <div><label>${t("address")}</label><input type="text" id="pedAddr" placeholder="${t("address")}" /></div>
         </div>
-        <button type="submit" class="adm-btn-primary">➕ Qo'shish</button>
+        <button type="submit" class="adm-btn-primary">➕ ${t("add_btn")}</button>
       </form>
       <div class="adm-table-wrap" style="margin-top:16px;">
         <table class="adm-table">
-          <thead><tr><th>Shifokor</th><th>Klinika</th><th>Telefon</th><th>Manzil</th><th></th></tr></thead>
+          <thead><tr><th>${t("name")}</th><th>${t("clinic")}</th><th>${t("phone")}</th><th>${t("address")}</th><th></th></tr></thead>
           <tbody>${(data || [])
             .map(
               (r) => `<tr>
@@ -190,10 +190,10 @@ async function renderPediatrician(el) {
       address: document.getElementById("pedAddr").value.trim() || null,
     });
     if (error) {
-      toast("Xato: " + error.message, "error");
+      toast(t("error") + ": " + error.message, "error");
       return;
     }
-    toast("✅ Qo'shildi", "success");
+    toast("✅ " + t("success"), "success");
     await renderPediatrician(el);
   });
 }
@@ -208,15 +208,15 @@ async function renderInsurance(el) {
     .catch(() => ({ data: null }));
   el.innerHTML = `
     <div class="adm-section">
-      <div class="adm-section-title">🛡️ Sug'urta ma'lumotlari</div>
+      <div class="adm-section-title">🛡️ ${t("insurance_info")}</div>
       <form id="insForm" class="ch-form">
         <div class="ch-form-grid">
-          <div><label>Sug'urta kompaniyasi</label><input type="text" id="insProvider" value="${data?.provider || ""}" placeholder="Uzinstrakh..." /></div>
-          <div><label>Polis raqami</label><input type="text" id="insPolicy" value="${data?.policy_number || ""}" placeholder="INS-12345" /></div>
-          <div><label>Amal qilish muddati</label><input type="date" id="insValid" value="${data?.valid_until || ""}" /></div>
+          <div><label>${t("insurance_company")}</label><input type="text" id="insProvider" value="${data?.provider || ""}" placeholder="${t("insurance_company")}" /></div>
+          <div><label>${t("policy_number")}</label><input type="text" id="insPolicy" value="${data?.policy_number || ""}" placeholder="INS-12345" /></div>
+          <div><label>${t("valid_until")}</label><input type="date" id="insValid" value="${data?.valid_until || ""}" /></div>
         </div>
-        <textarea id="insCoverage" placeholder="Qamrov haqida izoh" rows="3">${data?.coverage_notes || ""}</textarea>
-        <button type="submit" class="adm-btn-primary">💾 Saqlash</button>
+        <textarea id="insCoverage" placeholder="${t("coverage_notes")}" rows="3">${data?.coverage_notes || ""}</textarea>
+        <button type="submit" class="adm-btn-primary">💾 ${t("save_btn")}</button>
       </form>
     </div>
   `;
@@ -237,10 +237,10 @@ async function renderInsurance(el) {
           .eq("user_id", userId)
       : await supabase.from("insurance_info").insert(payload);
     if (error) {
-      toast("Xato: " + error.message, "error");
+      toast(t("error") + ": " + error.message, "error");
       return;
     }
-    toast("✅ Saqlandi", "success");
+    toast("✅ " + t("success"), "success");
   });
 }
 
@@ -252,33 +252,33 @@ async function renderBloodType(el) {
     .eq("user_id", userId);
   el.innerHTML = `
     <div class="adm-section">
-      <div class="adm-section-title">🩸 Qon guruhi</div>
+      <div class="adm-section-title">🩸 ${t("blood_type_title")}</div>
       <form id="btForm" class="ch-form">
         <div class="ch-form-grid">
-          <div><label>Bola</label><select id="btChild">${childOpts()}</select></div>
-          <div><label>Qon guruhi *</label>
+          <div><label>${t("select_child")}</label><select id="btChild">${childOpts()}</select></div>
+          <div><label>${t("blood_type")} *</label>
             <select id="btType" required>
-              <option value="">Tanlang</option>
-              ${["O", "A", "B", "AB"].map((t) => `<option value="${t}">${t}</option>`).join("")}
+              <option value="">${t("select_gender").replace("gender", "")}</option>
+              ${["O", "A", "B", "AB"].map((tp) => `<option value="${tp}">${tp}</option>`).join("")}
             </select>
           </div>
-          <div><label>Rh faktor</label>
+          <div><label>${t("rh_factor")}</label>
             <select id="btRh">
-              <option value="+">Rh+ (musbat)</option>
-              <option value="-">Rh- (manfiy)</option>
+              <option value="+">Rh+ (${t("positive")})</option>
+              <option value="-">Rh- (${t("negative")})</option>
             </select>
           </div>
         </div>
-        <button type="submit" class="adm-btn-primary">💾 Saqlash</button>
+        <button type="submit" class="adm-btn-primary">💾 ${t("save_btn")}</button>
       </form>
       <div class="adm-table-wrap" style="margin-top:16px;">
         <table class="adm-table">
-          <thead><tr><th>Bola</th><th>Qon guruhi</th><th>Rh</th><th></th></tr></thead>
+          <thead><tr><th>${t("select_child")}</th><th>${t("blood_type")}</th><th>Rh</th><th></th></tr></thead>
           <tbody>${(data || [])
             .map((r) => {
               const child = children.find((c) => c.id === r.child_id);
               return `<tr>
-              <td>${child?.name || "Ona"}</td>
+              <td>${child?.name || t("mh_title")}</td>
               <td><span class="adm-badge red">${r.blood_type}</span></td>
               <td><span class="adm-badge ${r.rh_factor === "+" ? "blue" : "gray"}">${r.rh_factor}</span></td>
               <td><button class="adm-btn-sm red" onclick="window.__famDel('blood_type_records','${r.id}',this)">🗑</button></td>
@@ -298,10 +298,10 @@ async function renderBloodType(el) {
       rh_factor: document.getElementById("btRh").value,
     });
     if (error) {
-      toast("Xato: " + error.message, "error");
+      toast(t("error") + ": " + error.message, "error");
       return;
     }
-    toast("✅ Saqlandi", "success");
+    toast("✅ " + t("success"), "success");
     await renderBloodType(el);
   });
 }
@@ -315,19 +315,19 @@ async function renderGoals(el) {
     .order("created_at", { ascending: false });
   el.innerHTML = `
     <div class="adm-section">
-      <div class="adm-section-title">🎯 Sog'liq maqsadlari</div>
+      <div class="adm-section-title">🎯 ${t("health_goals_title")}</div>
       <form id="goalForm" class="ch-form">
         <div class="ch-form-grid">
-          <div><label>Bola</label><select id="goalChild">${childOpts()}</select></div>
-          <div><label>Maqsad turi *</label><input type="text" id="goalType" placeholder="Vazn oshirish, emlash..." required /></div>
-          <div><label>Maqsad</label><input type="text" id="goalTarget" placeholder="12 kg ga yetish" /></div>
-          <div><label>Muddat</label><input type="date" id="goalDue" /></div>
+          <div><label>${t("select_child")}</label><select id="goalChild">${childOpts()}</select></div>
+          <div><label>${t("goal_type")} *</label><input type="text" id="goalType" placeholder="${t("goal_type")}" required /></div>
+          <div><label>${t("target")}</label><input type="text" id="goalTarget" placeholder="${t("target")}" /></div>
+          <div><label>${t("due_date")}</label><input type="date" id="goalDue" /></div>
         </div>
-        <button type="submit" class="adm-btn-primary">➕ Qo'shish</button>
+        <button type="submit" class="adm-btn-primary">➕ ${t("add_btn")}</button>
       </form>
       <div class="adm-table-wrap" style="margin-top:16px;">
         <table class="adm-table">
-          <thead><tr><th>Maqsad</th><th>Bola</th><th>Muddat</th><th>Holat</th><th></th></tr></thead>
+          <thead><tr><th>${t("goals")}</th><th>${t("select_child")}</th><th>${t("due_date")}</th><th>${t("status")}</th><th></th></tr></thead>
           <tbody>${(data || [])
             .map((r) => {
               const child = children.find((c) => c.id === r.child_id);
@@ -336,9 +336,8 @@ async function renderGoals(el) {
               <td>${child?.name || "—"}</td>
               <td>${r.due_date || "—"}</td>
               <td>
-                <button class="adm-btn-sm ${r.achieved ? "green" : "gray"}"
-                  onclick="window.__goalToggle('${r.id}',${r.achieved})">
-                  ${r.achieved ? "✅ Bajarildi" : "⏳ Jarayonda"}
+                <button class="adm-btn-sm ${r.achieved ? "green" : "gray"}" onclick="window.__goalToggle('${r.id}',${r.achieved})">
+                  ${r.achieved ? "✅ " + t("achieved") : "⏳ " + t("in_progress")}
                 </button>
               </td>
               <td><button class="adm-btn-sm red" onclick="window.__famDel('health_goals','${r.id}',this)">🗑</button></td>
@@ -359,10 +358,10 @@ async function renderGoals(el) {
       due_date: document.getElementById("goalDue").value || null,
     });
     if (error) {
-      toast("Xato: " + error.message, "error");
+      toast(t("error") + ": " + error.message, "error");
       return;
     }
-    toast("✅ Qo'shildi", "success");
+    toast("✅ " + t("success"), "success");
     await renderGoals(el);
   });
   window.__goalToggle = async (id, current) => {
@@ -385,23 +384,23 @@ async function renderNotes(el) {
     .limit(30);
   el.innerHTML = `
     <div class="adm-section">
-      <div class="adm-section-title">📝 Kunlik eslatmalar</div>
+      <div class="adm-section-title">📝 ${t("daily_notes_title")}</div>
       <form id="noteForm" class="ch-form">
         <div class="ch-form-grid">
-          <div><label>Bola</label><select id="noteChild">${childOpts()}</select></div>
-          <div><label>Sana</label><input type="date" id="noteDate" value="${today}" /></div>
-          <div><label>Kayfiyat</label>
+          <div><label>${t("select_child")}</label><select id="noteChild">${childOpts()}</select></div>
+          <div><label>${t("date")}</label><input type="date" id="noteDate" value="${today}" /></div>
+          <div><label>${t("mood")}</label>
             <select id="noteMood">
               <option value="">—</option>
-              <option value="great">😊 Ajoyib</option>
-              <option value="good">🙂 Yaxshi</option>
-              <option value="neutral">😐 O'rtacha</option>
-              <option value="bad">😟 Yomon</option>
+              <option value="great">😊 ${t("great")}</option>
+              <option value="good">🙂 ${t("good_rating")}</option>
+              <option value="neutral">😐 ${t("neutral")}</option>
+              <option value="bad">😟 ${t("bad")}</option>
             </select>
           </div>
         </div>
-        <textarea id="noteText" placeholder="Bugungi kuzatuvlar..." rows="3" required></textarea>
-        <button type="submit" class="adm-btn-primary">💾 Saqlash</button>
+        <textarea id="noteText" placeholder="${t("todays_observations")}" rows="3" required></textarea>
+        <button type="submit" class="adm-btn-primary">💾 ${t("save_btn")}</button>
       </form>
       <div style="margin-top:20px;">
         ${(data || [])
@@ -433,23 +432,43 @@ async function renderNotes(el) {
       note: document.getElementById("noteText").value.trim(),
     });
     if (error) {
-      toast("Xato: " + error.message, "error");
+      toast(t("error") + ": " + error.message, "error");
       return;
     }
-    toast("✅ Saqlandi", "success");
+    toast("✅ " + t("success"), "success");
     await renderNotes(el);
   });
 }
 
-// ─── Global delete ────────────────────────────────────────────────────────────
+// ─── Global delete (no confirm() — uses toast pattern) ────────────────────────
 window.__famDel = async (table, id, btn) => {
-  if (!confirm("O'chirishni tasdiqlaysizmi?")) return;
+  // Show inline confirmation via toast
+  const confirmed = await new Promise((resolve) => {
+    const toastEl = document.createElement("div");
+    toastEl.style.cssText =
+      "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:14px 20px;border-radius:12px;z-index:9999;display:flex;gap:12px;align-items:center;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,0.3);";
+    toastEl.innerHTML = `<span>${t("confirm_delete")}</span><button id="cfYes" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:600;">${t("yes")}</button><button id="cfNo" style="background:#475569;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;">${t("no")}</button>`;
+    document.body.appendChild(toastEl);
+    toastEl.querySelector("#cfYes").onclick = () => {
+      toastEl.remove();
+      resolve(true);
+    };
+    toastEl.querySelector("#cfNo").onclick = () => {
+      toastEl.remove();
+      resolve(false);
+    };
+    setTimeout(() => {
+      toastEl.remove();
+      resolve(false);
+    }, 5000);
+  });
+  if (!confirmed) return;
   const { error } = await supabase.from(table).delete().eq("id", id);
   if (error) {
-    toast("Xato: " + error.message, "error");
+    toast(t("error") + ": " + error.message, "error");
     return;
   }
-  toast("✅ O'chirildi", "success");
+  toast("✅ " + t("delete"), "success");
   btn?.closest("tr")?.remove();
 };
 
@@ -462,20 +481,20 @@ export async function renderPregnancyRecords(el, userId) {
     .order("created_at", { ascending: false });
   el.innerHTML = `
     <div class="adm-section">
-      <div class="adm-section-title">🤰 Homiladorlik yozuvlari</div>
+      <div class="adm-section-title">🤰 ${t("period_title")}</div>
       <form id="pregForm" class="ch-form">
         <div class="ch-form-grid">
-          <div><label>Kutilgan sana</label><input type="date" id="prDue" /></div>
-          <div><label>Oxirgi hayz</label><input type="date" id="prLast" /></div>
-          <div><label>Shifokor</label><input type="text" id="prDoctor" placeholder="Dr. Nazarova" /></div>
-          <div><label>Shifoxona</label><input type="text" id="prHospital" placeholder="1-son tug'ruqxona" /></div>
+          <div><label>${t("due_date")}</label><input type="date" id="prDue" /></div>
+          <div><label>${t("period_start")}</label><input type="date" id="prLast" /></div>
+          <div><label>${t("name")}</label><input type="text" id="prDoctor" placeholder="Dr. Smith" /></div>
+          <div><label>${t("clinic")}</label><input type="text" id="prHospital" placeholder="${t("clinic")}" /></div>
         </div>
-        <textarea id="prNotes" placeholder="Izoh" rows="2"></textarea>
-        <button type="submit" class="adm-btn-primary">💾 Saqlash</button>
+        <textarea id="prNotes" placeholder="${t("symptoms_placeholder")}" rows="2"></textarea>
+        <button type="submit" class="adm-btn-primary">💾 ${t("save_btn")}</button>
       </form>
       <div class="adm-table-wrap" style="margin-top:16px;">
         <table class="adm-table">
-          <thead><tr><th>Kutilgan sana</th><th>Shifokor</th><th>Shifoxona</th><th>Holat</th><th></th></tr></thead>
+          <thead><tr><th>${t("due_date")}</th><th>${t("name")}</th><th>${t("clinic")}</th><th>${t("status")}</th><th></th></tr></thead>
           <tbody>${(data || [])
             .map(
               (r) => `<tr>
@@ -502,10 +521,10 @@ export async function renderPregnancyRecords(el, userId) {
       notes: document.getElementById("prNotes").value.trim() || null,
     });
     if (error) {
-      toast("Xato: " + error.message, "error");
+      toast(t("error") + ": " + error.message, "error");
       return;
     }
-    toast("✅ Saqlandi", "success");
+    toast("✅ " + t("success"), "success");
     await renderPregnancyRecords(el, userId);
   });
 }
@@ -514,21 +533,21 @@ export async function renderPregnancyRecords(el, userId) {
 export async function renderSupportTicket(el, userId) {
   el.innerHTML = `
     <div class="adm-section">
-      <div class="adm-section-title">🎫 Qo'llab-quvvatlash so'rovi</div>
+      <div class="adm-section-title">🎫 ${t("send_feedback")}</div>
       <form id="ticketForm" class="ch-form">
         <div class="ch-form-grid">
-          <div><label>Mavzu *</label><input type="text" id="tkSubject" placeholder="Muammo tavsifi" required /></div>
-          <div><label>Muhimlik</label>
+          <div><label>${t("subject")} *</label><input type="text" id="tkSubject" placeholder="${t("subject")}" required /></div>
+          <div><label>${t("category")}</label>
             <select id="tkPriority">
-              <option value="low">Past</option>
-              <option value="normal" selected>O'rtacha</option>
-              <option value="high">Yuqori</option>
-              <option value="urgent">Shoshilinch</option>
+              <option value="low">${t("poor_rating")}</option>
+              <option value="normal" selected>${t("average_rating")}</option>
+              <option value="high">${t("good_rating")}</option>
+              <option value="urgent">${t("excellent")}</option>
             </select>
           </div>
         </div>
-        <textarea id="tkMessage" placeholder="Muammoni batafsil yozing..." rows="4" required></textarea>
-        <button type="submit" class="adm-btn-primary">📤 Yuborish</button>
+        <textarea id="tkMessage" placeholder="${t("write_feedback")}" rows="4" required></textarea>
+        <button type="submit" class="adm-btn-primary">📤 ${t("send")}</button>
       </form>
     </div>
   `;
@@ -543,10 +562,10 @@ export async function renderSupportTicket(el, userId) {
         priority: document.getElementById("tkPriority").value,
       });
       if (error) {
-        toast("Xato: " + error.message, "error");
+        toast(t("error") + ": " + error.message, "error");
         return;
       }
-      toast("✅ So'rovingiz yuborildi! Tez orada javob beramiz.", "success");
+      toast("✅ " + t("feedback_sent"), "success");
       document.getElementById("ticketForm").reset();
     });
 }

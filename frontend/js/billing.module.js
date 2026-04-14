@@ -140,7 +140,7 @@ function buildHTML(credits, freeRemaining, freePercent, freeUsed, freeLimit) {
   <div class="bl-free-card">
     <div class="bl-free-top">
       <span class="bl-free-title">🎁 ${t("free_credits")}</span>
-      <span class="bl-free-count">${freeRemaining}/${freeLimit} left</span>
+      <span class="bl-free-count">${freeRemaining}/${freeLimit} ${t("remaining")}</span>
     </div>
     <div class="bl-progress-bar">
       <div class="bl-progress-fill ${freePercent >= 80 ? "bl-progress-warn" : ""}" style="width:${freePercent}%"></div>
@@ -160,11 +160,11 @@ function buildHTML(credits, freeRemaining, freePercent, freeUsed, freeLimit) {
           ${pkg.popular ? `<div class="bl-pkg-badge">${t("most_popular")}</div>` : ""}
           <div class="bl-pkg-emoji">${pkg.emoji}</div>
           <div class="bl-pkg-name">${pkg.name}</div>
-          <div class="bl-pkg-credits">${pkg.credits}<span> Credits</span></div>
+          <div class="bl-pkg-credits">${pkg.credits}<span> ${t("credits_label")}</span></div>
           <div class="bl-pkg-price">${pkg.price}</div>
-          <div class="bl-pkg-per">${((parseFloat(pkg.price.replace("$", "")) / pkg.credits) * 100).toFixed(1)}¢ / credit</div>
+          <div class="bl-pkg-per">${((parseFloat(pkg.price.replace("$", "")) / pkg.credits) * 100).toFixed(1)}¢ / ${t("per_credit")}</div>
           <button class="bl-buy-btn" data-pkg="${pkg.id}" data-credits="${pkg.credits}" data-name="${pkg.name}" data-price="${pkg.price}">
-            Buy
+            ${t("buy_btn")}
           </button>
         </div>
       `,
@@ -187,7 +187,7 @@ function buildHTML(credits, freeRemaining, freePercent, freeUsed, freeLimit) {
           ${tier.popular ? `<div class="bl-tier-badge">${t("recommended")}</div>` : ""}
           <div class="bl-tier-name">${name}</div>
           <div class="bl-tier-price">${tier.price}</div>
-          <div class="bl-tier-credits">${tier.credits} credits/month</div>
+          <div class="bl-tier-credits">${tier.credits} ${t("credits_label")}/${t("month_short")}</div>
           <ul class="bl-tier-features">
             ${features.map((f) => `<li>✓ ${f}</li>`).join("")}
           </ul>
@@ -228,11 +228,11 @@ function attachEvents(container) {
         title: t("confirm_purchase"),
         emoji: "🪙",
         rows: [
-          ["Package", btn.dataset.name],
-          ["Credits", btn.dataset.credits],
-          ["Price", btn.dataset.price],
+          [t("package"), btn.dataset.name],
+          [t("credits_label"), btn.dataset.credits],
+          [t("price"), btn.dataset.price],
         ],
-        note: "You will be redirected to Stripe payment page",
+        note: t("stripe_redirect"),
         confirmText: t("pay_stripe"),
         onConfirm: async () => {
           await handleBuyStripe(
@@ -252,10 +252,10 @@ function attachEvents(container) {
         title: t("subscribe_btn"),
         emoji: "📅",
         rows: [
-          ["Plan", btn.dataset.name],
-          ["Credits", `${btn.dataset.credits}/month`],
+          [t("plan"), btn.dataset.name],
+          [t("credits_label"), `${btn.dataset.credits}/${t("month_short")}`],
         ],
-        note: "You will be redirected to Stripe payment page",
+        note: t("stripe_redirect"),
         confirmText: t("pay_stripe"),
         onConfirm: async () => {
           await handleSubscribeStripe(btn.dataset.tier, btn.dataset.name);

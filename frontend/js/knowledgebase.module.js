@@ -1,4 +1,5 @@
 import { supabase } from "./supabase.js";
+import { t } from "./i18n.js";
 
 let currentCategory = "";
 let currentArticles = [];
@@ -229,13 +230,15 @@ function toggleViews(view) {
 }
 
 function getCategoryTitle(category) {
-  if (category === "harmful") return "Harmful Medicines";
-  if (category === "immunity") return "Immunity Tips";
-  if (category === "vaccines") return "Vaccines Info";
-  if (category === "herbal") return "Natural Herbal Beverages";
-  if (category === "nutrition") return "Child Nutrition Tips";
-  if (category === "sleep") return "Sleep & Development";
-  return "Knowledge Base";
+  const map = {
+    harmful: t("kb_category_harmful"),
+    immunity: t("kb_category_immunity"),
+    vaccines: t("kb_category_vaccines"),
+    herbal: t("kb_category_herbal"),
+    nutrition: t("kb_category_nutrition"),
+    sleep: t("kb_category_sleep"),
+  };
+  return map[category] || t("kb_title");
 }
 
 function formatContent(text) {

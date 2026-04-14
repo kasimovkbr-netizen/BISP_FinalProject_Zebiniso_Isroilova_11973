@@ -251,27 +251,53 @@ function renderUsersTable(users) {
 }
 
 async function showAddCreditsModal(userId, email) {
-  const amount = prompt(`How many credits to add to ${email}?`, "50");
-  if (!amount || isNaN(amount) || parseInt(amount) <= 0) return;
+  // Use inline modal instead of prompt()
+  const existing = document.getElementById("addCreditsModal");
+  if (existing) existing.remove();
 
-  const { data: user } = await supabase
-    .from("users")
-    .select("credits")
-    .eq("id", userId)
-    .single();
-  const newCredits = (user?.credits || 0) + parseInt(amount);
+  const modal = document.createElement("div");
+  modal.id = "addCreditsModal";
+  modal.className = "admin-modal-overlay";
+  modal.innerHTML = `
+    <div class="admin-modal-box" style="max-width:360px;">
+      <h3>🪙 Add Credits</h3>
+      <p style="color:#64748b;font-size:14px;margin-bottom:12px;">${email}</p>
+      <input type="number" id="creditsAmount" value="50" min="1" max="10000"
+        style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #e2e8f0;font-size:15px;margin-bottom:16px;box-sizing:border-box;" />
+      <div class="admin-modal-actions">
+        <button id="confirmAddCredits" class="admin-add-btn">✅ Add</button>
+        <button type="button" id="cancelAddCredits">Cancel</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.querySelector("#cancelAddCredits").onclick = () => modal.remove();
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) modal.remove();
+  });
 
-  const { error } = await supabase
-    .from("users")
-    .update({ credits: newCredits })
-    .eq("id", userId);
-  if (error) {
-    toast("Error: " + error.message, "error");
-    return;
-  }
+  modal.querySelector("#confirmAddCredits").onclick = async () => {
+    const amount = parseInt(document.getElementById("creditsAmount").value);
+    if (!amount || amount <= 0) return;
+    modal.remove();
 
-  toast(`✅ ${amount} credits added. New balance: ${newCredits}`, "success");
-  await loadUsers();
+    const { data: user } = await supabase
+      .from("users")
+      .select("credits")
+      .eq("id", userId)
+      .single();
+    const newCredits = (user?.credits || 0) + amount;
+    const { error } = await supabase
+      .from("users")
+      .update({ credits: newCredits })
+      .eq("id", userId);
+    if (error) {
+      toast("Error: " + error.message, "error");
+      return;
+    }
+    toast(`✅ ${amount} credits added. New balance: ${newCredits}`, "success");
+    await loadUsers();
+  };
 }
 
 async function toggleUserRole(userId, currentRole) {
@@ -632,7 +658,26 @@ function showArticleModal({ title, article }) {
 }
 
 export async function deleteArticle(id) {
-  if (!confirm("Bu maqolani o'chirishni tasdiqlaysizmi?")) return;
+  const confirmed = await new Promise((resolve) => {
+    const toastEl = document.createElement("div");
+    toastEl.style.cssText =
+      "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:14px 20px;border-radius:12px;z-index:9999;display:flex;gap:12px;align-items:center;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,0.3);";
+    toastEl.innerHTML = `<span>Delete this article?</span><button id="cfYes" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-weight:600;">Yes</button><button id="cfNo" style="background:#475569;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;">No</button>`;
+    document.body.appendChild(toastEl);
+    toastEl.querySelector("#cfYes").onclick = () => {
+      toastEl.remove();
+      resolve(true);
+    };
+    toastEl.querySelector("#cfNo").onclick = () => {
+      toastEl.remove();
+      resolve(false);
+    };
+    setTimeout(() => {
+      toastEl.remove();
+      resolve(false);
+    }, 5000);
+  });
+  if (!confirmed) return;
   const { error } = await supabase.from("knowledge_base").delete().eq("id", id);
   if (error) {
     toast("Xato: " + error.message, "error");
