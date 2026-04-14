@@ -73,8 +73,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (error) throw error;
 
-        console.log("User registered:", data.user?.id);
-        // Users table row is created automatically via database trigger (Requirement 4.2 / 10.1)
+        // Ensure user row exists in public.users (fallback if trigger not set up)
+        if (data.user?.id) {
+          await supabase.from("users").upsert(
+            {
+              id: data.user.id,
+              email: data.user.email,
+              display_name: email.split("@")[0],
+              role: "parent",
+              credits: 50,
+              created_at: new Date().toISOString(),
+            },
+            { onConflict: "id", ignoreDuplicates: true },
+          );
+        }
 
         // 🔥 Endi redirect qilishimiz mumkin
         isRegistering = false;
@@ -103,6 +115,24 @@ document.addEventListener("DOMContentLoaded", () => {
           password,
         });
         if (error) throw error;
+
+        // Ensure user row exists (in case trigger wasn't set up)
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from("users").upsert(
+            {
+              id: user.id,
+              email: user.email,
+              role: "parent",
+              credits: 50,
+              created_at: new Date().toISOString(),
+            },
+            { onConflict: "id", ignoreDuplicates: true },
+          );
+        }
+
         window.location.href = "./dashboard.html";
       } catch (err) {
         toast(friendlyAuthError(err.message), "error");
