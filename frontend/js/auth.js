@@ -8,8 +8,42 @@ let isRegistering = false;
 /* =======================
    AUTH GUARD (FINAL)
 ======================= */
+
+// Show page immediately using getSession() — don't wait for onAuthStateChange
+(async () => {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
+  const path = window.location.pathname;
+
+  const isIndex = path.endsWith("/") || path.endsWith("index.html");
+  const isLogin = path.includes("login.html");
+  const isRegister = path.includes("register.html");
+  const isAuthPage = isLogin || isRegister;
+  const isDashboard = path.includes("dashboard.html");
+
+  if (!user && isDashboard) {
+    window.location.href = "./login.html";
+    return;
+  }
+  if (user && isAuthPage) {
+    window.location.href = "./dashboard.html";
+    return;
+  }
+
+  // Show page content
+  const authPage = document.getElementById("authPage");
+  if (authPage) authPage.style.display = "block";
+
+  if (isIndex) {
+    const app = document.getElementById("app");
+    if (app) app.style.display = "block";
+  }
+})();
+
 supabase.auth.onAuthStateChange((event, session) => {
-  // Ignore initial session check — let getSession() handle it
+  // Only handle actual sign-in/sign-out events, not initial session
   if (event === "INITIAL_SESSION") return;
 
   const user = session?.user ?? null;
@@ -21,30 +55,19 @@ supabase.auth.onAuthStateChange((event, session) => {
   const isAuthPage = isLogin || isRegister;
   const isDashboard = path.includes("dashboard.html");
 
-  // 🚫 login bo'lmagan user dashboardga kira olmaydi
   if (!user && isDashboard) {
     window.location.href = "./login.html";
     return;
   }
-
-  // 🔥 Registratsiya jarayonida redirect qilmaslik
-  if (isRegistering) {
-    return;
-  }
-
-  // 🚫 login bo'lgan user login/registerga kirmaydi
+  if (isRegistering) return;
   if (user && isAuthPage) {
     window.location.href = "./dashboard.html";
     return;
   }
 
-  // ✅ AUTH PAGE
   const authPage = document.getElementById("authPage");
-  if (authPage) {
-    authPage.style.display = "block";
-  }
+  if (authPage) authPage.style.display = "block";
 
-  // ✅ INDEX
   if (isIndex) {
     const app = document.getElementById("app");
     if (app) app.style.display = "block";
