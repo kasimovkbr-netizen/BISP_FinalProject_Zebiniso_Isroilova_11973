@@ -639,11 +639,7 @@ async function callGeminiFrontend(message, history, apiKey) {
     { role: "user", parts: [{ text: message }] },
   ];
 
-  const models = [
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    "gemini-1.5-flash-8b",
-  ];
+  const models = ["gemini-2.0-flash", "gemini-2.0-flash-lite"];
 
   for (const model of models) {
     try {

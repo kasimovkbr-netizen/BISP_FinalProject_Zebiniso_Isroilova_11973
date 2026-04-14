@@ -60,11 +60,7 @@ async function callGemini(prompt) {
   if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
 
   // Try models in order — fallback on quota exceeded
-  const models = [
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    "gemini-1.5-flash-8b",
-  ];
+  const models = ["gemini-2.0-flash", "gemini-2.0-flash-lite"];
 
   let lastError = null;
 
