@@ -440,32 +440,57 @@ async function loadCreditsTab() {
 async function loadFeedback() {
   const content = document.getElementById("adm-content");
 
-  const { data: tickets } = await supabase
-    .from("support_tickets")
-    .select("*, users(email)")
+  const { data: feedbacks, error } = await supabase
+    .from("app_feedback")
+    .select("*, users(email, display_name)")
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(100);
 
-  if (!tickets?.length) {
+  if (error) {
+    content.innerHTML = `<div class="adm-empty">Error loading feedback: ${error.message}</div>`;
+    return;
+  }
+
+  if (!feedbacks?.length) {
     content.innerHTML = `<div class="adm-empty">No feedback yet</div>`;
     return;
   }
 
+  const ratingStars = (r) => "⭐".repeat(Math.min(r || 0, 5));
+  const catColor = {
+    general: "gray",
+    bug: "red",
+    feature: "blue",
+    design: "purple",
+  };
+
   content.innerHTML = `
     <div class="adm-section">
-      <div class="adm-section-title">💬 Support Tickets (${tickets.length})</div>
+      <div class="adm-section-title">💬 User Feedback (${feedbacks.length})</div>
       <div class="adm-table-wrap">
         <table class="adm-table">
-          <thead><tr><th>User</th><th>Subject</th><th>Status</th><th>Date</th></tr></thead>
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Rating</th>
+              <th>Category</th>
+              <th>Message</th>
+              <th>Date</th>
+            </tr>
+          </thead>
           <tbody>
-            ${tickets
+            ${feedbacks
               .map(
-                (t) => `
+                (f) => `
               <tr>
-                <td>${esc(t.users?.email || "—")}</td>
-                <td>${esc(t.subject)}</td>
-                <td><span class="adm-badge ${t.status === "open" ? "red" : "green"}">${t.status}</span></td>
-                <td>${new Date(t.created_at).toLocaleDateString("en-US")}</td>
+                <td>
+                  <div style="font-size:13px;">${esc(f.users?.email || "—")}</div>
+                  ${f.users?.display_name ? `<div style="font-size:11px;color:#94a3b8;">${esc(f.users.display_name)}</div>` : ""}
+                </td>
+                <td><span style="font-size:14px;">${ratingStars(f.rating)}</span> <span style="color:#64748b;font-size:12px;">${f.rating}/5</span></td>
+                <td><span class="adm-badge ${catColor[f.category] || "gray"}">${f.category || "—"}</span></td>
+                <td style="max-width:300px;font-size:13px;color:#475569;">${esc(f.message || "—")}</td>
+                <td style="font-size:12px;color:#94a3b8;">${new Date(f.created_at).toLocaleDateString("en-US")}</td>
               </tr>
             `,
               )
