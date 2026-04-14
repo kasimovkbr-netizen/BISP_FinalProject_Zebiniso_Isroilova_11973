@@ -76,7 +76,7 @@ function setupChildFilter() {
   const select = document.getElementById("vaccinationChildSelect");
   if (!select) return;
 
-  select.onchange = () => {
+  select.onchange = async () => {
     selectedChildId = select.value || null;
 
     // Cleanup previous realtime channel
@@ -91,6 +91,10 @@ function setupChildFilter() {
     }
 
     toggleList(true);
+
+    // Auto-generate vaccination records if none exist
+    await ensureVaccinationRecords(selectedChildId);
+
     loadVaccinationList(selectedChildId);
   };
 }
@@ -140,6 +144,13 @@ async function fetchAndRenderVaccinations(childId) {
 
   listEl.innerHTML = "";
 
+  if (!data || data.length === 0) {
+    listEl.innerHTML = `<li style="padding:20px;text-align:center;color:#94a3b8;font-size:14px;">
+      No vaccination records found for this child.
+    </li>`;
+    return;
+  }
+
   // Sort by scheduled_date ascending
   const records = (data || []).sort((a, b) =>
     a.scheduled_date.localeCompare(b.scheduled_date),
@@ -169,6 +180,33 @@ async function fetchAndRenderVaccinations(childId) {
 
     listEl.appendChild(li);
   });
+}
+
+/* ======================
+   ENSURE VACCINATION RECORDS
+   Auto-generate if none exist for this child
+====================== */
+async function ensureVaccinationRecords(childId) {
+  // Check if records already exist
+  const { data: existing } = await supabase
+    .from("vaccination_records")
+    .select("id")
+    .eq("child_id", childId)
+    .limit(1);
+
+  if (existing && existing.length > 0) return; // already generated
+
+  // Get child's birth_date
+  const { data: child } = await supabase
+    .from("children")
+    .select("birth_date, name")
+    .eq("id", childId)
+    .single();
+
+  // Use birth_date if available, otherwise use today as reference
+  const birthDate = child?.birth_date || new Date().toISOString().split("T")[0];
+
+  await generateVaccinationRecords(childId, userId, birthDate);
 }
 
 /* ======================
