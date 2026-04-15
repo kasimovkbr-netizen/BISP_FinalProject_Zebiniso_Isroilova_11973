@@ -336,6 +336,15 @@ async function runAIAnalysis(analysisId, type, data) {
     if (!res.ok || !result.success) {
       if (result.error?.code === "insufficient_credits") {
         block.innerHTML = `<div class="ai-error-box">❌ Insufficient credits. Required: <b>${result.error.creditsNeeded}</b>, available: <b>${result.error.creditsAvailable ?? 0}</b>. <a href="#" onclick="document.querySelector('[data-page=billing]')?.click();return false;">Buy credits →</a></div>`;
+      } else if (result.error?.message?.includes("quota")) {
+        // Fallback to direct Gemini API
+        const geminiReply = await runGeminiFallback(type, data);
+        if (geminiReply) {
+          renderAISummary(block, geminiReply);
+          btn.textContent = "🔄 Re-analyze";
+        } else {
+          block.innerHTML = `<div class="ai-error-box">❌ AI service quota exceeded. Please try again later.</div>`;
+        }
       } else {
         block.innerHTML = `<div class="ai-error-box">❌ ${result.error?.message || "AI analysis failed"}</div>`;
       }
@@ -352,6 +361,45 @@ async function runAIAnalysis(analysisId, type, data) {
     block.innerHTML = `<div class="ai-error-box">${msg}</div>`;
   } finally {
     btn.disabled = false;
+  }
+}
+
+async function runGeminiFallback(type, data) {
+  const apiKey =
+    window.__GEMINI_KEY__ || "AIzaSyDDXkN5EEmP-TrZ-TXD923nGKRU7Zhnf_8";
+  const valuesText = Object.entries(data || {})
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(", ");
+  const prompt = `You are a pediatric health AI. Analyze this ${type} test result for a child: ${valuesText}. Provide a brief interpretation and 2-3 recommendations in English. Respond in JSON format: {"interpretation": "...", "recommendations": ["...", "..."]}`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 512 },
+        }),
+        signal: AbortSignal.timeout(20000),
+      },
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    const text = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) {
+      const parsed = JSON.parse(match[0]);
+      return {
+        interpretation: parsed.interpretation,
+        recommendations: parsed.recommendations,
+        creditsUsed: 0,
+      };
+    }
+    return { interpretation: text, recommendations: [], creditsUsed: 0 };
+  } catch {
+    return null;
   }
 }
 

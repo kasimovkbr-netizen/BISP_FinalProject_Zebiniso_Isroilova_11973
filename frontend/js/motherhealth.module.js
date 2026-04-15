@@ -221,7 +221,6 @@ async function showSupplementsSection() {
       name,
       dosage: dosage || null,
       times_per_day: times,
-      notes: "mother_supplement",
     });
 
     if (error) {
@@ -245,7 +244,6 @@ async function loadSupplements(userId) {
     .select("id, name, dosage, times_per_day")
     .eq("parent_id", userId)
     .is("child_id", null)
-    .eq("notes", "mother_supplement")
     .order("created_at", { ascending: false });
 
   if (!data?.length) {

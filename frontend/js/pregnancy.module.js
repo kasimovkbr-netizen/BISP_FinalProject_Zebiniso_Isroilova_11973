@@ -600,7 +600,8 @@ async function sendChatMessage() {
 
     // Fallback: direct Gemini API call
     if (!reply) {
-      const geminiKey = window.__GEMINI_KEY__;
+      const geminiKey =
+        window.__GEMINI_KEY__ || "AIzaSyDDXkN5EEmP-TrZ-TXD923nGKRU7Zhnf_8";
       if (geminiKey) {
         reply = await callGeminiFrontend(message, chatHistory, geminiKey);
       } else {
