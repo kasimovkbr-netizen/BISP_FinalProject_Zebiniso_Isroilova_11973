@@ -640,7 +640,13 @@ async function callGeminiFrontend(message, history, apiKey) {
     { role: "user", parts: [{ text: message }] },
   ];
 
-  const models = ["gemini-2.0-flash", "gemini-2.0-flash-lite"];
+  const models = [
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash-8b",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+  ];
 
   for (const model of models) {
     try {
@@ -659,6 +665,7 @@ async function callGeminiFrontend(message, history, apiKey) {
       );
       if (!res.ok) continue;
       const data = await res.json();
+      if (data.error?.code === 429) continue;
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
       if (text) return text;
     } catch (_) {

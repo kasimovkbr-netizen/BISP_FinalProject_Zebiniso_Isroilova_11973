@@ -372,35 +372,48 @@ async function runGeminiFallback(type, data) {
     .join(", ");
   const prompt = `You are a pediatric health AI. Analyze this ${type} test result for a child: ${valuesText}. Provide a brief interpretation and 2-3 recommendations in English. Respond in JSON format: {"interpretation": "...", "recommendations": ["...", "..."]}`;
 
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 512 },
-        }),
-        signal: AbortSignal.timeout(20000),
-      },
-    );
-    if (!res.ok) return null;
-    const json = await res.json();
-    const text = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    const match = text.match(/\{[\s\S]*\}/);
-    if (match) {
-      const parsed = JSON.parse(match[0]);
-      return {
-        interpretation: parsed.interpretation,
-        recommendations: parsed.recommendations,
-        creditsUsed: 0,
-      };
+  const models = [
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash-8b",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+  ];
+
+  for (const model of models) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: { maxOutputTokens: 512 },
+          }),
+          signal: AbortSignal.timeout(20000),
+        },
+      );
+      if (!res.ok) continue;
+      const json = await res.json();
+      if (json.error?.code === 429) continue;
+      const text = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      if (!text) continue;
+      const match = text.match(/\{[\s\S]*\}/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        return {
+          interpretation: parsed.interpretation,
+          recommendations: parsed.recommendations,
+          creditsUsed: 0,
+        };
+      }
+      return { interpretation: text, recommendations: [], creditsUsed: 0 };
+    } catch {
+      continue;
     }
-    return { interpretation: text, recommendations: [], creditsUsed: 0 };
-  } catch {
-    return null;
   }
+  return null;
 }
 
 function renderAISummary(block, result) {
