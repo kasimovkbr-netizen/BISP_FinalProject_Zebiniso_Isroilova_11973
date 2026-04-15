@@ -91,9 +91,24 @@ function setupChildFilter() {
 /* ======================
    DAILY CHECKLIST
 ====================== */
-const TIME_SLOTS_EN = ["Morning", "Afternoon", "Evening", "Night"];
-const TIME_SLOTS_KEYS = ["morning", "afternoon", "evening", "night"];
-const TIME_SLOTS = TIME_SLOTS_EN; // used for DB storage (always English)
+// Time slots by times_per_day:
+// 1x: Morning
+// 2x: Morning, Evening
+// 3x: Morning, Afternoon, Evening
+// 4x: Morning, Afternoon, Evening, Night
+function getSlotsForTimesPerDay(n) {
+  if (n === 1) return ["Morning"];
+  if (n === 2) return ["Morning", "Evening"];
+  if (n === 3) return ["Morning", "Afternoon", "Evening"];
+  return ["Morning", "Afternoon", "Evening", "Night"].slice(0, n);
+}
+
+const TIME_SLOTS_KEYS = {
+  Morning: "morning",
+  Afternoon: "afternoon",
+  Evening: "evening",
+  Night: "night",
+};
 
 function loadChecklistRealtime() {
   // Initial render
@@ -136,7 +151,7 @@ async function renderChecklist() {
 
   for (const med of medicines || []) {
     const timesPerDay = Number(med.times_per_day) || 1;
-    const slots = TIME_SLOTS.slice(0, timesPerDay);
+    const slots = getSlotsForTimesPerDay(timesPerDay);
 
     for (const slot of slots) {
       const { data: logs, error: logError } = await supabase
@@ -155,9 +170,8 @@ async function renderChecklist() {
       const taken = existingLog ? existingLog.taken : false;
 
       const li = document.createElement("li");
-      const slotLabel =
-        t(TIME_SLOTS_KEYS[TIME_SLOTS.indexOf(slot)] || slot.toLowerCase()) ||
-        slot;
+      const slotKey = TIME_SLOTS_KEYS[slot] || slot.toLowerCase();
+      const slotLabel = t(slotKey) || slot;
       li.innerHTML = `
         <label>${med.name} – ${med.dosage} (${slotLabel})</label>
         <input type="checkbox" ${taken ? "checked" : ""}>

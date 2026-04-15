@@ -389,26 +389,15 @@ export function showDeleteConfirmDialog() {
 export async function deleteAccount() {
   if (!currentUser) return;
   try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    // Delete from public.users (cascades to all user data)
+    const { error: delError } = await supabase
+      .from("users")
+      .delete()
+      .eq("id", currentUser.id);
 
-    const token = session?.access_token;
-    if (!token) throw new Error("No active session");
+    if (delError) throw delError;
 
-    const apiBase = window.__API_BASE_URL__ || "";
-    const res = await fetch(`${apiBase}/api/account`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body?.error?.message || "Failed to delete account");
-    }
-
+    // Sign out
     await supabase.auth.signOut();
     window.location.href = "../index.html";
   } catch (e) {

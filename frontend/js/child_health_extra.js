@@ -241,30 +241,53 @@ async function loadDiaperList(childId) {
 
 // ─── DENTAL ───────────────────────────────────────────────────────────────────
 export async function renderDental(el, childId, userId) {
+  // Get children list for select
+  const { data: kids } = await supabase
+    .from("children")
+    .select("id, name")
+    .eq("parent_id", userId);
+  const childOpts = `<option value="">— Select child —</option>${(kids || []).map((c) => `<option value="${c.id}" ${c.id === childId ? "selected" : ""}>${c.name}</option>`).join("")}`;
+
   el.innerHTML = `
     <div class="adm-section">
-      <div class="adm-section-title">🦷 Tish shifokor tashriflari</div>
+      <div class="adm-section-title">🦷 Dental Visits</div>
+      <select id="dentalChildSel" class="ch-child-select" style="margin-bottom:14px;">${childOpts}</select>
       <form id="dentalForm" class="ch-form">
         <div class="ch-form-grid">
-          <div><label>Sana *</label><input type="date" id="dtDate" required /></div>
-          <div><label>Shifokor</label><input type="text" id="dtDentist" placeholder="Dr. Yusupov" /></div>
-          <div><label>Muolaja</label><input type="text" id="dtProc" placeholder="Tish tozalash..." /></div>
-          <div><label>Keyingi tashrif</label><input type="date" id="dtNext" /></div>
+          <div><label>Date *</label><input type="date" id="dtDate" required /></div>
+          <div><label>Dentist</label><input type="text" id="dtDentist" placeholder="Dr. Smith" /></div>
+          <div><label>Procedure</label><input type="text" id="dtProc" placeholder="Cleaning..." /></div>
+          <div><label>Next visit</label><input type="date" id="dtNext" /></div>
         </div>
-        <textarea id="dtNotes" placeholder="Izoh" rows="2"></textarea>
-        <button type="submit" class="adm-btn-primary">💾 Saqlash</button>
+        <textarea id="dtNotes" placeholder="Notes" rows="2"></textarea>
+        <button type="submit" class="adm-btn-primary">💾 Save</button>
       </form>
       <div id="dentalList" style="margin-top:16px;"></div>
     </div>
   `;
-  if (!childId) return;
-  await loadDentalList(childId);
+
+  let activeChildId = childId;
+
+  document
+    .getElementById("dentalChildSel")
+    .addEventListener("change", async (e) => {
+      activeChildId = e.target.value;
+      if (activeChildId) await loadDentalList(activeChildId);
+      else document.getElementById("dentalList").innerHTML = "";
+    });
+
+  if (activeChildId) await loadDentalList(activeChildId);
+
   document
     .getElementById("dentalForm")
     .addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (!activeChildId) {
+        toast("Please select a child", "warning");
+        return;
+      }
       const { error } = await supabase.from("child_dental_records").insert({
-        child_id: childId,
+        child_id: activeChildId,
         parent_id: userId,
         visit_date: document.getElementById("dtDate").value,
         dentist: document.getElementById("dtDentist").value.trim() || null,
@@ -273,12 +296,12 @@ export async function renderDental(el, childId, userId) {
         notes: document.getElementById("dtNotes").value.trim() || null,
       });
       if (error) {
-        toast("Xato: " + error.message, "error");
+        toast("Error: " + error.message, "error");
         return;
       }
-      toast("✅ Saqlandi", "success");
+      toast("✅ Saved", "success");
       e.target.reset();
-      await loadDentalList(childId);
+      await loadDentalList(activeChildId);
     });
 }
 
@@ -312,31 +335,53 @@ async function loadDentalList(childId) {
 
 // ─── EYE ──────────────────────────────────────────────────────────────────────
 export async function renderEye(el, childId, userId) {
+  const { data: kids } = await supabase
+    .from("children")
+    .select("id, name")
+    .eq("parent_id", userId);
+  const childOpts = `<option value="">— Select child —</option>${(kids || []).map((c) => `<option value="${c.id}" ${c.id === childId ? "selected" : ""}>${c.name}</option>`).join("")}`;
+
   el.innerHTML = `
     <div class="adm-section">
-      <div class="adm-section-title">👁️ Ko'z tekshiruvi</div>
+      <div class="adm-section-title">👁️ Eye Examination</div>
+      <select id="eyeChildSel" class="ch-child-select" style="margin-bottom:14px;">${childOpts}</select>
       <form id="eyeForm" class="ch-form">
         <div class="ch-form-grid">
-          <div><label>Sana *</label><input type="date" id="eyDate" required /></div>
-          <div><label>O'ng ko'z</label><input type="text" id="eyRight" placeholder="20/20" /></div>
-          <div><label>Chap ko'z</label><input type="text" id="eyLeft" placeholder="20/20" /></div>
-          <div><label>Tashxis</label><input type="text" id="eyDiag" placeholder="Miopiya..." /></div>
+          <div><label>Date *</label><input type="date" id="eyDate" required /></div>
+          <div><label>Right eye</label><input type="text" id="eyRight" placeholder="20/20" /></div>
+          <div><label>Left eye</label><input type="text" id="eyLeft" placeholder="20/20" /></div>
+          <div><label>Diagnosis</label><input type="text" id="eyDiag" placeholder="Myopia..." /></div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
           <input type="checkbox" id="eyGlasses" />
-          <label for="eyGlasses" style="font-size:14px;">Ko'zoynak kerak</label>
+          <label for="eyGlasses" style="font-size:14px;">Glasses needed</label>
         </div>
-        <button type="submit" class="adm-btn-primary" style="margin-top:12px;">💾 Saqlash</button>
+        <button type="submit" class="adm-btn-primary" style="margin-top:12px;">💾 Save</button>
       </form>
       <div id="eyeList" style="margin-top:16px;"></div>
     </div>
   `;
-  if (!childId) return;
-  await loadEyeList(childId);
+
+  let activeChildId = childId;
+
+  document
+    .getElementById("eyeChildSel")
+    .addEventListener("change", async (e) => {
+      activeChildId = e.target.value;
+      if (activeChildId) await loadEyeList(activeChildId);
+      else document.getElementById("eyeList").innerHTML = "";
+    });
+
+  if (activeChildId) await loadEyeList(activeChildId);
+
   document.getElementById("eyeForm").addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (!activeChildId) {
+      toast("Please select a child", "warning");
+      return;
+    }
     const { error } = await supabase.from("child_eye_records").insert({
-      child_id: childId,
+      child_id: activeChildId,
       parent_id: userId,
       visit_date: document.getElementById("eyDate").value,
       right_eye: document.getElementById("eyRight").value.trim() || null,
@@ -345,12 +390,12 @@ export async function renderEye(el, childId, userId) {
       glasses: document.getElementById("eyGlasses").checked,
     });
     if (error) {
-      toast("Xato: " + error.message, "error");
+      toast("Error: " + error.message, "error");
       return;
     }
-    toast("✅ Saqlandi", "success");
+    toast("✅ Saved", "success");
     e.target.reset();
-    await loadEyeList(childId);
+    await loadEyeList(activeChildId);
   });
 }
 
@@ -385,47 +430,69 @@ async function loadEyeList(childId) {
 
 // ─── HEARING ──────────────────────────────────────────────────────────────────
 export async function renderHearing(el, childId, userId) {
+  const { data: kids } = await supabase
+    .from("children")
+    .select("id, name")
+    .eq("parent_id", userId);
+  const childOpts = `<option value="">— Select child —</option>${(kids || []).map((c) => `<option value="${c.id}" ${c.id === childId ? "selected" : ""}>${c.name}</option>`).join("")}`;
+
   el.innerHTML = `
     <div class="adm-section">
-      <div class="adm-section-title">👂 Eshitish tekshiruvi</div>
+      <div class="adm-section-title">👂 Hearing Test</div>
+      <select id="hearingChildSel" class="ch-child-select" style="margin-bottom:14px;">${childOpts}</select>
       <form id="hearingForm" class="ch-form">
         <div class="ch-form-grid">
-          <div><label>Sana *</label><input type="date" id="hrDate" required /></div>
-          <div><label>Natija</label>
+          <div><label>Date *</label><input type="date" id="hrDate" required /></div>
+          <div><label>Result</label>
             <select id="hrResult">
               <option value="normal">Normal</option>
-              <option value="mild_loss">Yengil yo'qotish</option>
-              <option value="moderate_loss">O'rtacha yo'qotish</option>
-              <option value="severe_loss">Og'ir yo'qotish</option>
+              <option value="mild_loss">Mild loss</option>
+              <option value="moderate_loss">Moderate loss</option>
+              <option value="severe_loss">Severe loss</option>
             </select>
           </div>
         </div>
-        <textarea id="hrNotes" placeholder="Izoh" rows="2"></textarea>
-        <button type="submit" class="adm-btn-primary">💾 Saqlash</button>
+        <textarea id="hrNotes" placeholder="Notes" rows="2"></textarea>
+        <button type="submit" class="adm-btn-primary">💾 Save</button>
       </form>
       <div id="hearingList" style="margin-top:16px;"></div>
     </div>
   `;
-  if (!childId) return;
-  await loadHearingList(childId);
+
+  let activeChildId = childId;
+
+  document
+    .getElementById("hearingChildSel")
+    .addEventListener("change", async (e) => {
+      activeChildId = e.target.value;
+      if (activeChildId) await loadHearingList(activeChildId);
+      else document.getElementById("hearingList").innerHTML = "";
+    });
+
+  if (activeChildId) await loadHearingList(activeChildId);
+
   document
     .getElementById("hearingForm")
     .addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (!activeChildId) {
+        toast("Please select a child", "warning");
+        return;
+      }
       const { error } = await supabase.from("child_hearing_records").insert({
-        child_id: childId,
+        child_id: activeChildId,
         parent_id: userId,
         test_date: document.getElementById("hrDate").value,
         result: document.getElementById("hrResult").value,
         notes: document.getElementById("hrNotes").value.trim() || null,
       });
       if (error) {
-        toast("Xato: " + error.message, "error");
+        toast("Error: " + error.message, "error");
         return;
       }
-      toast("✅ Saqlandi", "success");
+      toast("✅ Saved", "success");
       e.target.reset();
-      await loadHearingList(childId);
+      await loadHearingList(activeChildId);
     });
 }
 

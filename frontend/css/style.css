@@ -126,6 +126,23 @@
 .auth-page input {
   padding: 12px 14px;
   border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  font-size: 15px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.auth-page .pw-input-wrap {
+  width: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.auth-page .pw-input-wrap input {
+  width: 100%;
+  padding-right: 44px;
+}
   border: 1px solid #cbd5e1;
   font-size: 14px;
 }
@@ -8392,24 +8409,32 @@ input:checked + .toggle-slider:before {
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
 }
 .pw-input-wrap input {
   width: 100%;
   padding-right: 44px !important;
+  box-sizing: border-box;
 }
 .pw-eye-btn {
   position: absolute;
   right: 10px;
-  background: none;
-  border: none;
+  background: none !important;
+  border: none !important;
   cursor: pointer;
   font-size: 16px;
   padding: 4px;
   color: #94a3b8;
   line-height: 1;
   user-select: none;
+  width: auto !important;
+  height: auto !important;
+  min-width: unset !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  flex-shrink: 0;
 }
-.pw-eye-btn:hover { color: #475569; }
+.pw-eye-btn:hover { color: #475569; background: none !important; }
 .settings-field .pw-input-wrap input {
   width: 100%;
   box-sizing: border-box;
