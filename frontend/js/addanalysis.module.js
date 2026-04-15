@@ -366,7 +366,7 @@ async function runAIAnalysis(analysisId, type, data) {
 
 async function runGeminiFallback(type, data) {
   const apiKey =
-    window.__GEMINI_KEY__ || "AIzaSyDDXkN5EEmP-TrZ-TXD923nGKRU7Zhnf_8";
+    window.__GEMINI_KEY__ || "AIzaSyBmYxayD0Df8QepFW0VVs-R_ygL7QD6Z5o";
   const valuesText = Object.entries(data || {})
     .map(([k, v]) => `${k}: ${v}`)
     .join(", ");
