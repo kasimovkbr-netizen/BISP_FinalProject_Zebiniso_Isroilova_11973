@@ -55,16 +55,85 @@ async function deductCredits(userId, amount) {
   return true;
 }
 
+async function callGroq(prompt) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) throw new Error("GROQ_API_KEY not configured");
+
+  const models = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "mixtral-8x7b-32768",
+  ];
+
+  let lastError = null;
+
+  for (const model of models) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
+    try {
+      const res = await fetch(
+        "https://api.groq.com/openai/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.4,
+            max_tokens: 600,
+          }),
+          signal: controller.signal,
+        },
+      );
+
+      const json = await res.json();
+
+      if (json.error?.code === "rate_limit_exceeded" || res.status === 429) {
+        console.warn(`[AI] Groq ${model} rate limited, trying next...`);
+        lastError = new Error(`Groq ${model}: rate limited`);
+        continue;
+      }
+
+      if (!res.ok) {
+        lastError = new Error(json.error?.message || `Groq ${model} failed`);
+        continue;
+      }
+
+      const text = json.choices?.[0]?.message?.content || "";
+      if (!text) {
+        lastError = new Error(`Groq ${model} returned empty response`);
+        continue;
+      }
+
+      console.log(`[AI] used Groq model: ${model}`);
+      return text;
+    } catch (e) {
+      if (e.name === "AbortError") {
+        lastError = new Error(`Groq ${model} timeout`);
+      } else {
+        lastError = e;
+      }
+      continue;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  throw lastError || new Error("All Groq models failed");
+}
+
 async function callGemini(prompt) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
 
-  // Try models in order — fallback on quota exceeded
   const models = [
     "gemini-2.5-flash",
     "gemini-2.0-flash",
     "gemini-2.0-flash-lite",
-    "gemini-2.5-pro",
   ];
 
   let lastError = null;
@@ -87,7 +156,6 @@ async function callGemini(prompt) {
 
       const json = await res.json();
 
-      // Quota exceeded or model not found — try next model
       if (
         json.error?.code === 429 ||
         json.error?.code === 404 ||
@@ -95,7 +163,7 @@ async function callGemini(prompt) {
         json.error?.status === "NOT_FOUND"
       ) {
         console.warn(
-          `[AI] ${model} failed (${json.error?.code}), trying next...`,
+          `[AI] Gemini ${model} failed (${json.error?.code}), trying next...`,
         );
         lastError = new Error(
           `${model}: ${json.error?.message || json.error?.code}`,
@@ -119,7 +187,7 @@ async function callGemini(prompt) {
         continue;
       }
 
-      console.log(`[AI] used model: ${model}`);
+      console.log(`[AI] used Gemini model: ${model}`);
       return text;
     } catch (e) {
       if (e.name === "AbortError") {
@@ -133,9 +201,18 @@ async function callGemini(prompt) {
     }
   }
 
-  throw (
-    lastError || new Error("All Gemini models quota exceeded. Try again later.")
-  );
+  throw lastError || new Error("All Gemini models quota exceeded");
+}
+
+// Primary: Groq (fast, free, no daily limit)
+// Fallback: Gemini (if Groq fails)
+async function callAI(prompt) {
+  try {
+    return await callGroq(prompt);
+  } catch (groqErr) {
+    console.warn("[AI] Groq failed, falling back to Gemini:", groqErr.message);
+    return await callGemini(prompt);
+  }
 }
 
 function buildPrompt(type, data, childInfo) {
@@ -252,7 +329,7 @@ router.post("/analysis/ai", async (req, res) => {
         .json({ success: false, error: { code: "invalid_type" } });
     }
 
-    const aiResponse = await callGemini(prompt);
+    const aiResponse = await callAI(prompt);
     console.log("[AI] raw response:", aiResponse?.substring(0, 200));
 
     // Parse JSON response — handle markdown code blocks too
