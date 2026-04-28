@@ -61,10 +61,9 @@ async function callGemini(prompt) {
 
   // Try models in order — fallback on quota exceeded
   const models = [
-    "gemini-2.5-flash-preview-04-17",
+    "gemini-2.5-flash",
     "gemini-2.0-flash",
     "gemini-2.0-flash-lite",
-    "gemini-2.5-flash",
     "gemini-2.5-pro",
   ];
 
