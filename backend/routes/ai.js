@@ -356,17 +356,16 @@ router.post("/analysis/ai", async (req, res) => {
     // Deduct credits after successful AI call
     await deductCredits(userId, creditCost);
 
-    // Log credit transaction
-    await supabase
-      .from("credit_transactions")
-      .insert({
+    // Log credit transaction (non-critical, ignore errors)
+    try {
+      await supabase.from("credit_transactions").insert({
         user_id: userId,
         type: "ai_analysis",
         amount: -creditCost,
         balance_after: credits - creditCost,
         description: `${type} tahlili uchun ${creditCost} kredit`,
-      })
-      .catch(() => {});
+      });
+    } catch (_) {}
 
     // Save AI result to analysis record
     if (analysisId) {
