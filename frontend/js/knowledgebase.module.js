@@ -1,10 +1,29 @@
 import { supabase } from "./supabase.js";
 import { t, getLang } from "./i18n.js";
 
+const API_BASE =
+  window.__API_BASE__ || "https://pediamom-production.up.railway.app";
+
+async function fetchArticlesByCategory(category) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token || "";
+
+  const res = await fetch(
+    `${API_BASE}/api/knowledge?category=${encodeURIComponent(category)}`,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    },
+  );
+  if (!res.ok) throw new Error("Failed to fetch articles");
+  const json = await res.json();
+  return json.data || [];
+}
+
 let currentCategory = "";
 let currentArticles = [];
 let rootClickHandler = null;
-let realtimeChannel = null;
 
 export function initKnowledgeBaseModule() {
   const homeView = document.getElementById("kbHomeView");
@@ -21,11 +40,6 @@ export function destroyKnowledgeBaseModule() {
   const page = document.querySelector(".knowledge-page");
   if (page && rootClickHandler) {
     page.removeEventListener("click", rootClickHandler);
-  }
-
-  if (realtimeChannel) {
-    supabase.removeChannel(realtimeChannel);
-    realtimeChannel = null;
   }
 
   rootClickHandler = null;
@@ -85,20 +99,8 @@ async function loadArticlesByCategory(category) {
   title.textContent = getCategoryTitle(category);
 
   try {
-    const { data, error } = await supabase
-      .from("knowledge_base")
-      .select(
-        "id, title, title_uz, summary, summary_uz, content, content_uz, warning, category",
-      )
-      .eq("category", category);
-
-    if (error) throw error;
-
-    currentArticles = data || [];
-
-    // Subscribe to realtime changes for this category
-    subscribeToKnowledgeBase(category);
-
+    const data = await fetchArticlesByCategory(category);
+    currentArticles = data;
     renderArticlesList();
     showListView();
   } catch (error) {
@@ -110,31 +112,6 @@ async function loadArticlesByCategory(category) {
     `;
     showListView();
   }
-}
-
-function subscribeToKnowledgeBase(category) {
-  // Remove any existing channel before creating a new one
-  if (realtimeChannel) {
-    supabase.removeChannel(realtimeChannel);
-    realtimeChannel = null;
-  }
-
-  realtimeChannel = supabase
-    .channel("knowledge_base_changes")
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "knowledge_base",
-        filter: `category=eq.${category}`,
-      },
-      () => {
-        // Re-load articles on any change
-        loadArticlesByCategory(category);
-      },
-    )
-    .subscribe();
 }
 
 function locField(article, field) {

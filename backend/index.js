@@ -118,7 +118,8 @@ app.use("/api", (req, res, next) => {
   if (
     req.path.startsWith("/webhooks/") ||
     req.path === "/telegram/webhook" ||
-    req.path === "/health"
+    req.path === "/health" ||
+    req.path.startsWith("/knowledge")
   ) {
     return next();
   }
@@ -143,6 +144,10 @@ app.use("/api", aiRoutes);
 // Mount chat routes
 const chatRoutes = require("./routes/chat");
 app.use("/api", chatRoutes);
+
+// Mount knowledge base routes (public — no auth required)
+const knowledgeRoutes = require("./routes/knowledge");
+app.use("/api", knowledgeRoutes);
 
 // Delete account endpoint — backend calls supabase.auth.admin.deleteUser()
 // which cascades all related data via ON DELETE CASCADE (Requirement 10.6)
