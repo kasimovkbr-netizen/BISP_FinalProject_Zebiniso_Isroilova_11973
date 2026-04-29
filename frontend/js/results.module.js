@@ -216,23 +216,8 @@ async function loadResults(parentId) {
       .map((kv) => `<span class="value-chip">${kv}</span>`)
       .join("");
 
-    const aiLabel = t("ai_analysis");
-    const recsLabel = t("recommendations");
-    const aiHTML = result.ai_result
-      ? `
-      <div class="ai-result-inline">
-        <div class="ai-result-label">🤖 ${aiLabel}</div>
-        <p class="ai-result-text">${result.ai_result.interpretation || ""}</p>
-        ${
-          result.ai_result.recommendations?.length
-            ? `
-          <ul class="ai-result-recs">
-            ${result.ai_result.recommendations.map((r) => `<li>${r}</li>`).join("")}
-          </ul>`
-            : ""
-        }
-        <div class="ai-result-date">📅 ${result.ai_analyzed_at ? new Date(result.ai_analyzed_at).toLocaleDateString() : ""}</div>
-      </div>`
+    const aiAnalyzedBadge = result.ai_result
+      ? `<span class="ai-badge">🤖 AI</span>`
       : "";
 
     li.innerHTML = `
@@ -240,9 +225,9 @@ async function loadResults(parentId) {
         <div class="card-header">
           <span class="child-name">${childrenMap[result.child_id]}</span>
           <span class="type-badge ${result.type}">${result.type}</span>
+          ${aiAnalyzedBadge}
         </div>
         <div class="values">${valuesHTML}</div>
-        ${aiHTML}
         <div class="date">📅 ${result.created_at ? new Date(result.created_at).toLocaleString() : "N/A"}</div>
       </div>
       <div class="actions">
